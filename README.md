@@ -4,7 +4,7 @@ Machine-learning-powered match outcome predictor for the 2026 FIFA World Cup (US
 
 ## What it does
 
-- Downloads and processes historical international football results (1872–present) from Kaggle
+- Downloads and processes historical international football results (1872–present) from GitHub (martj42/international_results)
 - Engineers features: Elo ratings, recent form, head-to-head records, home/neutral venue, confederation strength
 - Trains an XGBoost classifier to predict win / draw / loss probabilities for any fixture
 - Simulates the full tournament bracket and surfaces expected winners
@@ -20,7 +20,7 @@ wc2026_predictor/
 │   └── processed/      # Engineered feature tables (gitignored)
 ├── notebooks/          # EDA and experiment notebooks
 ├── src/
-│   ├── fetch_data.py   # Download raw data from Kaggle
+│   ├── fetch_data.py   # Download raw data from GitHub
 │   ├── features.py     # Feature engineering pipeline
 │   ├── train.py        # Model training & evaluation
 │   ├── simulate.py     # Tournament bracket simulation
@@ -41,13 +41,7 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-### 2. Set up Kaggle credentials
-
-1. Go to https://www.kaggle.com/settings → **API** → **Create New Token**
-2. Place the downloaded `kaggle.json` in `%USERPROFILE%\.kaggle\` (Windows) or `~/.kaggle/` (Linux/Mac)
-3. The file must contain `{"username":"...","key":"..."}`
-
-### 3. Fetch raw data
+### 2. Fetch raw data
 
 ```bash
 python src/fetch_data.py
@@ -58,14 +52,14 @@ Downloads to `data/raw/`:
 - `goalscorers.csv` — individual goalscorer records
 - `shootouts.csv` — penalty shootout outcomes
 
-### 4. Build features & train the model
+### 3. Build features & train the model
 
 ```bash
 python src/features.py
 python src/train.py
 ```
 
-### 5. Run the Streamlit app
+### 4. Run the Streamlit app
 
 ```bash
 streamlit run app/streamlit_app.py
@@ -73,7 +67,7 @@ streamlit run app/streamlit_app.py
 
 ## Dataset
 
-[International football results from 1872 to 2017 (and beyond)](https://www.kaggle.com/datasets/martj42/international-football-results-from-1872-to-2017) — Mart Jürisoo, Kaggle.
+[International football results (1872–present)](https://github.com/martj42/international_results) — Mart Jürisoo, GitHub.
 
 ## Tech stack
 
