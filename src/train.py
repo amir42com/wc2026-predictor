@@ -9,9 +9,11 @@ held out for evaluation.  No shuffling — preserves chronological ordering to
 prevent leakage.
 
 Usage:
-    python src/train.py
+    python src/train.py              # train + evaluate
+    python src/train.py --backtest   # also run WC backtesting (trains 4 extra models)
 """
 
+import argparse
 from pathlib import Path
 
 import joblib
@@ -36,6 +38,8 @@ NUMERIC_COLS = [
 ]
 
 LABEL_MAP = {0: "Home win", 1: "Draw", 2: "Away win"}
+
+WC_BACKTEST_YEARS = [2010, 2014, 2018, 2022]
 
 
 def make_X(df: pd.DataFrame, feature_cols: list[str] | None = None) -> tuple[pd.DataFrame, list[str]]:
@@ -121,7 +125,100 @@ def evaluate(model: XGBClassifier, df_test: pd.DataFrame, feature_cols: list[str
         print(f"\n  World Cup matches only ({wc_mask.sum()}):  accuracy = {wc_acc:.4f}")
 
 
+def _brier_multiclass(y_true: np.ndarray, proba: np.ndarray) -> float:
+    """Mean multi-class Brier score: mean over matches of sum_c (p_c - y_c)^2."""
+    y_bin = np.zeros_like(proba)
+    y_bin[np.arange(len(y_true)), y_true] = 1.0
+    return float(np.mean(np.sum((proba - y_bin) ** 2, axis=1)))
+
+
+def backtest_wc(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Walk-forward backtest over WC_BACKTEST_YEARS.
+
+    For each tournament year:
+      - Train a fresh model on all matches BEFORE that year (no leakage).
+      - Evaluate on that year's World Cup matches only.
+
+    Returns a DataFrame with one row per tournament plus a Combined row.
+    """
+    rows: list[dict] = []
+
+    for year in WC_BACKTEST_YEARS:
+        wc_mask = (df["is_world_cup"] == 1) & (df["date"].dt.year == year)
+        df_wc = df[wc_mask].reset_index(drop=True)
+
+        if len(df_wc) == 0:
+            print(f"  WC {year}: no matches found in features.csv — skipping.")
+            continue
+
+        df_pre = df[df["date"].dt.year < year].reset_index(drop=True)
+        print(f"  WC {year}: {len(df_wc):>2} matches | "
+              f"training on {len(df_pre):,} pre-{year} matches ...")
+
+        model_y, fc = train_model(df_pre)
+
+        X_wc, _ = make_X(df_wc, fc)
+        y_wc     = df_wc["outcome"].values
+        proba    = model_y.predict_proba(X_wc)
+        y_pred   = proba.argmax(axis=1)
+
+        rows.append({
+            "Tournament": f"WC {year}",
+            "Matches":    len(df_wc),
+            "Accuracy":   accuracy_score(y_wc, y_pred),
+            "Log-loss":   log_loss(y_wc, proba),
+            "Brier":      _brier_multiclass(y_wc, proba),
+        })
+
+    if not rows:
+        return pd.DataFrame()
+
+    result = pd.DataFrame(rows)
+
+    # Combined row — weighted by match count so per-sample metrics stay correct
+    n = result["Matches"].sum()
+    combined = {
+        "Tournament": "Combined",
+        "Matches":    n,
+        "Accuracy":   (result["Accuracy"] * result["Matches"]).sum() / n,
+        "Log-loss":   (result["Log-loss"] * result["Matches"]).sum() / n,
+        "Brier":      (result["Brier"]    * result["Matches"]).sum() / n,
+    }
+    return pd.concat([result, pd.DataFrame([combined])], ignore_index=True)
+
+
+def _print_backtest_table(df: pd.DataFrame) -> None:
+    sep   = "=" * 62
+    inner = "-" * 62
+    header = f"{'Tournament':<14} {'Matches':>7}  {'Accuracy':>9}  {'Log-loss':>9}  {'Brier':>9}"
+
+    print(f"\n{'WC Backtesting Results':^62}")
+    print(f"{'(each model trained on pre-tournament data only)':^62}")
+    print(sep)
+    print(header)
+    print(inner)
+
+    for _, row in df.iterrows():
+        is_combined = row["Tournament"] == "Combined"
+        if is_combined:
+            print(inner)
+        print(
+            f"{row['Tournament']:<14} {int(row['Matches']):>7}  "
+            f"{row['Accuracy']*100:>8.1f}%  "
+            f"{row['Log-loss']:>9.4f}  "
+            f"{row['Brier']:>9.4f}"
+        )
+
+    print(sep)
+
+
 def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--backtest", action="store_true",
+                        help="Run WC walk-forward backtest (trains 4 extra models, ~2 min)")
+    args = parser.parse_args()
+
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
 
     print("Loading features.csv ...")
@@ -152,6 +249,13 @@ def main() -> None:
     for feat, score in imp.items():
         bar = "#" * int(score * 400)
         print(f"  {feat:<30s} {score:.4f}  {bar}")
+
+    if args.backtest:
+        print(f"\n\nRunning WC backtest for {WC_BACKTEST_YEARS} ...")
+        print("(trains one model per tournament on pre-tournament data)\n")
+        bt = backtest_wc(df)
+        if not bt.empty:
+            _print_backtest_table(bt)
 
 
 if __name__ == "__main__":
