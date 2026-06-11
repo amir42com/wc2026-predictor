@@ -20,6 +20,7 @@ from train import make_X
 
 PROCESSED_DIR = Path(__file__).resolve().parents[1] / "data" / "processed"
 MODELS_DIR    = Path(__file__).resolve().parents[1] / "models"
+RAW_DIR       = Path(__file__).resolve().parents[1] / "data" / "raw"
 
 WC_TEAMS = sorted({t for teams in GROUPS.values() for t in teams})
 
@@ -48,6 +49,67 @@ def load_resources():
     return bundle, predictor, explainer, elo_df
 
 
+# ── first-run bootstrap ───────────────────────────────────────────────────
+
+def _bootstrap_if_needed() -> None:
+    """
+    On Streamlit Cloud (or any cold start) the processed data and model
+    files won't exist.  This runs the full pipeline once, showing progress
+    in the UI, then calls st.rerun() so the app loads normally.
+    """
+    missing_raw      = not (RAW_DIR / "results.csv").exists()
+    missing_features = not (PROCESSED_DIR / "features.csv").exists()
+    missing_model    = not (MODELS_DIR / "xgb_wc2026.joblib").exists()
+
+    if not (missing_raw or missing_features or missing_model):
+        return  # everything already present
+
+    import fetch_data as _fd
+    import features  as _feat
+    import train     as _tr
+
+    st.title("⚽ WC 2026 Predictor")
+    with st.status("First-run setup — this takes ~2 minutes…", expanded=True) as _s:
+
+        if missing_raw:
+            st.write("Downloading match data from GitHub (1872–2026)…")
+            RAW_DIR.mkdir(parents=True, exist_ok=True)
+            _fd.main()
+            st.write("Data downloaded.")
+
+        if missing_features:
+            st.write("Engineering features (Elo, form, H2H, confederation)…")
+            PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
+            _df = (
+                pd.read_csv(RAW_DIR / "results.csv", parse_dates=["date"])
+                .dropna(subset=["home_score", "away_score"])
+                .sort_values("date")
+                .reset_index(drop=True)
+            )
+            feat_df, elo_df = _feat.build_features(_df)
+            feat_df.to_csv(PROCESSED_DIR / "features.csv",    index=False)
+            elo_df.to_csv( PROCESSED_DIR / "elo_ratings.csv", index=False)
+            st.write(f"Features built: {len(feat_df):,} matches.")
+
+        if missing_model:
+            st.write("Training XGBoost model (~30 seconds)…")
+            MODELS_DIR.mkdir(parents=True, exist_ok=True)
+            _df2 = pd.read_csv(PROCESSED_DIR / "features.csv", parse_dates=["date"])
+            mask  = _df2["date"].dt.year < _tr.TEST_YEAR
+            model, feature_cols = _tr.train_model(_df2[mask].reset_index(drop=True))
+            _bundle = {
+                "model":        model,
+                "feature_cols": feature_cols,
+                "label_map":    _tr.LABEL_MAP,
+            }
+            joblib.dump(_bundle, MODELS_DIR / "xgb_wc2026.joblib")
+            st.write("Model trained and saved.")
+
+        _s.update(label="Setup complete — loading app…", state="complete")
+
+    st.rerun()
+
+
 # ── page config ────────────────────────────────────────────────────────────
 
 st.set_page_config(
@@ -57,14 +119,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ── guard: resources exist ─────────────────────────────────────────────────
-
-if not (MODELS_DIR / "xgb_wc2026.joblib").exists():
-    st.error("Model not found. Run `python src/train.py` first.")
-    st.stop()
-if not (PROCESSED_DIR / "features.csv").exists():
-    st.error("Features not found. Run `python src/features.py` first.")
-    st.stop()
+_bootstrap_if_needed()
 
 bundle, predictor, explainer, elo_df = load_resources()
 ALL_TEAMS = sorted(predictor._state.keys())
