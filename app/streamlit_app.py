@@ -201,8 +201,63 @@ st.sidebar.caption(
 # ══════════════════════════════════════════════════════════════════════════
 
 if page == "Match Predictor":
-    st.title("Match Predictor")
-    st.caption("Win / draw / loss probabilities for any international fixture.")
+    st.markdown("""
+<div style="
+    background: linear-gradient(135deg, #0a0e27 0%, #0d1b3e 40%, #0a1628 70%, #000000 100%);
+    border-radius: 14px;
+    padding: 2.4rem 2rem 2rem 2rem;
+    margin-bottom: 1.4rem;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.07);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+">
+  <!-- faint pitch lines -->
+  <div style="
+      position:absolute; inset:0;
+      background:
+        repeating-linear-gradient(90deg, transparent, transparent 49%, rgba(255,255,255,0.03) 49%, rgba(255,255,255,0.03) 51%),
+        repeating-linear-gradient(0deg,  transparent, transparent 49%, rgba(255,255,255,0.03) 49%, rgba(255,255,255,0.03) 51%);
+      background-size: 60px 60px;
+      border-radius:14px;
+  "></div>
+  <!-- centre circle -->
+  <div style="
+      position:absolute; top:50%; left:50%;
+      transform:translate(-50%,-50%);
+      width:220px; height:220px;
+      border-radius:50%;
+      border:1px solid rgba(255,255,255,0.05);
+  "></div>
+  <!-- content -->
+  <div style="position:relative; text-align:center;">
+    <div style="font-size:2.6rem; line-height:1;">⚽</div>
+    <h1 style="
+        margin: 0.3rem 0 0.2rem 0;
+        font-size: clamp(1.6rem, 5vw, 2.6rem);
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        background: linear-gradient(90deg, #4fc3f7, #ffffff, #81d4fa);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    ">FIFA WORLD CUP 2026</h1>
+    <p style="
+        margin: 0;
+        font-size: clamp(0.8rem, 2.5vw, 1rem);
+        color: rgba(255,255,255,0.55);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+    ">United States &nbsp;·&nbsp; Canada &nbsp;·&nbsp; Mexico</p>
+    <p style="
+        margin: 0.5rem 0 0 0;
+        font-size: clamp(0.75rem, 2vw, 0.9rem);
+        color: rgba(255,255,255,0.38);
+        letter-spacing: 0.08em;
+    ">June 11 – July 19, 2026</p>
+  </div>
+</div>
+""", unsafe_allow_html=True)
 
     # ── team selectors ─────────────────────────────────────────────────────
     c1, cmid, c2 = st.columns([5, 1, 5])
