@@ -34,6 +34,44 @@ CONF_COLOR = {
     "Other":    "#95a5a6",
 }
 
+FLAGS: dict[str, str] = {
+    # CONMEBOL
+    "Argentina":   "🇦🇷", "Brazil":     "🇧🇷", "Colombia":   "🇨🇴",
+    "Ecuador":     "🇪🇨", "Uruguay":    "🇺🇾", "Paraguay":   "🇵🇾",
+    "Chile":       "🇨🇱", "Venezuela":  "🇻🇪", "Peru":       "🇵🇪",
+    "Bolivia":     "🇧🇴",
+    # UEFA
+    "France":      "🇫🇷", "Spain":      "🇪🇸", "Germany":    "🇩🇪",
+    "Portugal":    "🇵🇹", "England":    "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "Netherlands": "🇳🇱",
+    "Belgium":     "🇧🇪", "Italy":      "🇮🇹", "Croatia":    "🇭🇷",
+    "Switzerland": "🇨🇭", "Denmark":    "🇩🇰", "Sweden":     "🇸🇪",
+    "Norway":      "🇳🇴", "Austria":    "🇦🇹", "Poland":     "🇵🇱",
+    "Serbia":      "🇷🇸", "Scotland":   "🏴󠁧󠁢󠁳󠁣󠁴󠁿", "Turkey":     "🇹🇷",
+    "Czech Republic": "🇨🇿", "Slovakia": "🇸🇰", "Hungary":   "🇭🇺",
+    "Romania":     "🇷🇴", "Ukraine":    "🇺🇦", "Greece":     "🇬🇷",
+    "Bosnia and Herzegovina": "🇧🇦", "Albania": "🇦🇱", "Georgia": "🇬🇪",
+    "Slovenia":    "🇸🇮",
+    # CONCACAF
+    "United States": "🇺🇸", "Mexico":   "🇲🇽", "Canada":    "🇨🇦",
+    "Panama":      "🇵🇦", "Costa Rica": "🇨🇷", "Jamaica":   "🇯🇲",
+    "Haiti":       "🇭🇹", "Honduras":  "🇭🇳", "Guatemala":  "🇬🇹",
+    "El Salvador": "🇸🇻", "Trinidad and Tobago": "🇹🇹",
+    "Curaçao":     "🇨🇼",
+    # CAF
+    "Morocco":     "🇲🇦", "Senegal":   "🇸🇳", "Egypt":      "🇪🇬",
+    "Nigeria":     "🇳🇬", "Ghana":     "🇬🇭", "Ivory Coast": "🇨🇮",
+    "Cameroon":    "🇨🇲", "Mali":      "🇲🇱", "Algeria":    "🇩🇿",
+    "Tunisia":     "🇹🇳", "South Africa": "🇿🇦", "DR Congo":  "🇨🇩",
+    "Cape Verde":  "🇨🇻",
+    # AFC
+    "Japan":       "🇯🇵", "South Korea": "🇰🇷", "Australia": "🇦🇺",
+    "Iran":        "🇮🇷", "Saudi Arabia": "🇸🇦", "Qatar":    "🇶🇦",
+    "Iraq":        "🇮🇶", "Jordan":    "🇯🇴", "Uzbekistan": "🇺🇿",
+    "China":       "🇨🇳", "India":     "🇮🇳", "UAE":        "🇦🇪",
+    # OFC
+    "New Zealand": "🇳🇿",
+}
+
 # ── cached resources ───────────────────────────────────────────────────────
 
 @st.cache_resource
@@ -152,13 +190,15 @@ if page == "Match Predictor":
     c1, cmid, c2 = st.columns([5, 1, 5])
     with c1:
         home_default = ALL_TEAMS.index("Argentina") if "Argentina" in ALL_TEAMS else 0
-        home_team = st.selectbox("Home team", ALL_TEAMS, index=home_default)
+        home_team = st.selectbox("Home team", ALL_TEAMS, index=home_default,
+                                  format_func=lambda t: f"{FLAGS.get(t, '')} {t}".strip())
     with cmid:
         st.markdown("<div style='text-align:center;padding-top:2rem;font-size:1.5rem'>vs</div>",
                     unsafe_allow_html=True)
     with c2:
         away_default = ALL_TEAMS.index("France") if "France" in ALL_TEAMS else 1
-        away_team = st.selectbox("Away team", ALL_TEAMS, index=away_default)
+        away_team = st.selectbox("Away team", ALL_TEAMS, index=away_default,
+                                 format_func=lambda t: f"{FLAGS.get(t, '')} {t}".strip())
 
     neutral = st.checkbox("Neutral venue (World Cup)", value=True)
 
@@ -195,7 +235,11 @@ if page == "Match Predictor":
     X, _ = make_X(pd.DataFrame([feat_row]), bundle["feature_cols"])
     proba = bundle["model"].predict_proba(X)[0]   # [p_home_win, p_draw, p_away_win]
     predicted_class = int(proba.argmax())
-    outcome_labels  = [f"{home_team} Win", "Draw", f"{away_team} Win"]
+    outcome_labels  = [
+        f"{FLAGS.get(home_team, '')} {home_team} Win".strip(),
+        "Draw",
+        f"{FLAGS.get(away_team, '')} {away_team} Win".strip(),
+    ]
 
     # ── probability display ────────────────────────────────────────────────
     st.markdown("---")
@@ -332,8 +376,12 @@ elif page == "Tournament Simulator":
     )
     df_wins["color"] = df_wins["confederation"].map(CONF_COLOR).fillna(CONF_COLOR["Other"])
 
+    df_wins["label"] = df_wins["team"].map(
+        lambda t: f"{FLAGS.get(t, '')} {t}".strip()
+    )
+
     fig_wins = go.Figure(go.Bar(
-        x=df_wins["team"],
+        x=df_wins["label"],
         y=df_wins["pct"],
         marker_color=df_wins["color"].tolist(),
         text=df_wins["pct"].map("{:.1f}%".format),
@@ -455,9 +503,10 @@ else:
     )
     wc_df.index = wc_df.index + 1
 
-    # Add group
+    # Add group and flag
     team_to_group = {t: g for g, ts in GROUPS.items() for t in ts}
     wc_df.insert(0, "Group", wc_df["Team"].map(team_to_group))
+    wc_df.insert(1, "Flag", wc_df["Team"].map(lambda t: FLAGS.get(t, "")))
     wc_df = wc_df.sort_values("Group")
 
     st.dataframe(wc_df, use_container_width=True, height=600)
