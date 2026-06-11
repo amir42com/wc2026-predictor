@@ -163,19 +163,22 @@ bundle, predictor, explainer, elo_df = load_resources()
 ALL_TEAMS = sorted(predictor._state.keys())
 
 # ── global styling: load Noto Color Emoji so flags render on Windows Chrome ─
+# IMPORTANT: Noto Color Emoji must come LAST in the font stack so it only
+# activates for emoji codepoints — listing it first breaks digit/letter spacing.
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Noto+Color+Emoji&display=swap');
-html, body, [class*="stMarkdown"], [class*="stMetric"],
-[data-testid="stMetricLabel"], [data-testid="stSelectbox"] * {
+[data-testid="stMetricLabel"],
+[data-testid="stSelectbox"] *,
+[data-testid="stDataFrameResizable"] * {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-                 "Noto Color Emoji", "Segoe UI Emoji", sans-serif;
+                 Arial, sans-serif, "Noto Color Emoji" !important;
 }
-.stDataFrame * { font-family: "Noto Color Emoji", sans-serif; }
 </style>
 """, unsafe_allow_html=True)
 
-_CHART_FONT = dict(family="'Noto Color Emoji', -apple-system, BlinkMacSystemFont, sans-serif")
+# Noto Color Emoji last so Latin/digit glyphs come from system fonts, emoji from NotoColorEmoji
+_CHART_FONT = dict(family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif, 'Noto Color Emoji'")
 
 # ── sidebar navigation ─────────────────────────────────────────────────────
 
@@ -340,9 +343,10 @@ if page == "Match Predictor":
         hovertemplate="%{y}: %{x:.4f}<extra></extra>",
     ))
     fig_shap.update_layout(
-        xaxis_title="SHAP value  (red = pushes toward this outcome, blue = pushes away)",
+        xaxis_title="SHAP value",
         height=480,
-        margin=dict(l=10, r=20, t=10, b=40),
+        margin=dict(l=10, r=20, t=45, b=40),
+        yaxis=dict(automargin=True),
         font=_CHART_FONT,
     )
     st.plotly_chart(fig_shap, use_container_width=True)
@@ -405,13 +409,15 @@ elif page == "Tournament Simulator":
         marker_color=dw["color"].tolist(),
         text=dw["pct"].map("{:.1f}%".format),
         textposition="outside",
+        cliponaxis=False,
         hovertemplate="%{y}<br>%{x:.2f}%<extra></extra>",
     ))
     fig_wins.update_layout(
         xaxis_title="Win probability (%)",
         height=max(420, len(dw) * 34),
-        margin=dict(t=20, b=30, l=175, r=70),
-        xaxis=dict(range=[0, dw["pct"].max() * 1.28]),
+        margin=dict(t=20, b=30, l=175, r=55),
+        xaxis=dict(range=[0, dw["pct"].max() * 1.35], automargin=True),
+        yaxis=dict(automargin=True),
         font=_CHART_FONT,
     )
     st.plotly_chart(fig_wins, use_container_width=True)
@@ -499,13 +505,15 @@ else:
         marker_line_color="white",
         text=td["elo"].map("{:.0f}".format),
         textposition="outside",
+        cliponaxis=False,
         hovertemplate="%{y}<br>Elo: %{x:.1f}<extra></extra>",
     ))
     fig_elo.update_layout(
         xaxis_title="Elo rating",
         height=max(420, len(td) * 28),
-        margin=dict(t=20, b=30, l=175, r=80),
-        xaxis=dict(range=[td["elo"].min() * 0.97, td["elo"].max() * 1.04]),
+        margin=dict(t=20, b=30, l=175, r=55),
+        xaxis=dict(range=[td["elo"].min() * 0.97, td["elo"].max() * 1.1], automargin=True),
+        yaxis=dict(automargin=True),
         font=_CHART_FONT,
     )
     st.plotly_chart(fig_elo, use_container_width=True)
