@@ -162,6 +162,21 @@ _bootstrap_if_needed()
 bundle, predictor, explainer, elo_df = load_resources()
 ALL_TEAMS = sorted(predictor._state.keys())
 
+# ── global styling: load Noto Color Emoji so flags render on Windows Chrome ─
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Color+Emoji&display=swap');
+html, body, [class*="stMarkdown"], [class*="stMetric"],
+[data-testid="stMetricLabel"], [data-testid="stSelectbox"] * {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                 "Noto Color Emoji", "Segoe UI Emoji", sans-serif;
+}
+.stDataFrame * { font-family: "Noto Color Emoji", sans-serif; }
+</style>
+""", unsafe_allow_html=True)
+
+_CHART_FONT = dict(family="'Noto Color Emoji', -apple-system, BlinkMacSystemFont, sans-serif")
+
 # ── sidebar navigation ─────────────────────────────────────────────────────
 
 st.sidebar.title("⚽ WC 2026 Predictor")
@@ -328,6 +343,7 @@ if page == "Match Predictor":
         xaxis_title="SHAP value  (red = pushes toward this outcome, blue = pushes away)",
         height=480,
         margin=dict(l=10, r=20, t=10, b=40),
+        font=_CHART_FONT,
     )
     st.plotly_chart(fig_shap, use_container_width=True)
 
@@ -379,21 +395,24 @@ elif page == "Tournament Simulator":
     df_wins["label"] = df_wins["team"].map(
         lambda t: f"{FLAGS.get(t, '')} {t}".strip()
     )
+    # reverse so highest probability appears at top of horizontal chart
+    dw = df_wins.iloc[::-1].reset_index(drop=True)
 
     fig_wins = go.Figure(go.Bar(
-        x=df_wins["label"],
-        y=df_wins["pct"],
-        marker_color=df_wins["color"].tolist(),
-        text=df_wins["pct"].map("{:.1f}%".format),
+        x=dw["pct"],
+        y=dw["label"],
+        orientation="h",
+        marker_color=dw["color"].tolist(),
+        text=dw["pct"].map("{:.1f}%".format),
         textposition="outside",
-        hovertemplate="%{x}<br>%{y:.2f}%<extra></extra>",
+        hovertemplate="%{y}<br>%{x:.2f}%<extra></extra>",
     ))
     fig_wins.update_layout(
-        yaxis_title="Win probability (%)",
-        xaxis_tickangle=-35,
-        height=500,
-        margin=dict(t=30, b=10),
-        yaxis=dict(range=[0, df_wins["pct"].max() * 1.18]),
+        xaxis_title="Win probability (%)",
+        height=max(420, len(dw) * 34),
+        margin=dict(t=20, b=30, l=175, r=70),
+        xaxis=dict(range=[0, dw["pct"].max() * 1.28]),
+        font=_CHART_FONT,
     )
     st.plotly_chart(fig_wins, use_container_width=True)
 
@@ -467,22 +486,27 @@ else:
     top_df["color"] = top_df["confederation"].map(CONF_COLOR).fillna(CONF_COLOR["Other"])
     top_df["wc2026"] = top_df["team"].isin(WC_TEAMS)
 
+    top_df["label"] = top_df["team"].map(lambda t: f"{FLAGS.get(t, '')} {t}".strip())
+    # reverse so highest Elo appears at top
+    td = top_df.iloc[::-1].reset_index(drop=True)
+
     fig_elo = go.Figure(go.Bar(
-        x=top_df["team"],
-        y=top_df["elo"],
-        marker_color=top_df["color"].tolist(),
-        marker_line_width=top_df["wc2026"].map(lambda b: 2.5 if b else 0).tolist(),
+        x=td["elo"],
+        y=td["label"],
+        orientation="h",
+        marker_color=td["color"].tolist(),
+        marker_line_width=td["wc2026"].map(lambda b: 2.5 if b else 0).tolist(),
         marker_line_color="white",
-        text=top_df["elo"].map("{:.0f}".format),
+        text=td["elo"].map("{:.0f}".format),
         textposition="outside",
-        hovertemplate="%{x}<br>Elo: %{y:.1f}<extra></extra>",
+        hovertemplate="%{y}<br>Elo: %{x:.1f}<extra></extra>",
     ))
     fig_elo.update_layout(
-        yaxis_title="Elo rating",
-        xaxis_tickangle=-40,
-        height=540,
-        margin=dict(t=30, b=10),
-        yaxis=dict(range=[top_df["elo"].min() * 0.97, top_df["elo"].max() * 1.025]),
+        xaxis_title="Elo rating",
+        height=max(420, len(td) * 28),
+        margin=dict(t=20, b=30, l=175, r=80),
+        xaxis=dict(range=[td["elo"].min() * 0.97, td["elo"].max() * 1.04]),
+        font=_CHART_FONT,
     )
     st.plotly_chart(fig_elo, use_container_width=True)
 
