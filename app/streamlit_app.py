@@ -380,19 +380,24 @@ if page == "Match Predictor":
          "June 11 – July 19, 2026")
 
     # ── team selectors ─────────────────────────────────────────────────────
+    show_all = st.session_state.get("show_all_teams", False)
+    team_pool = ALL_TEAMS if show_all else WC_TEAMS
+
     c1, cmid, c2 = st.columns([5, 1, 5])
     with c1:
-        home_default = ALL_TEAMS.index("Argentina") if "Argentina" in ALL_TEAMS else 0
-        home_team = st.selectbox("Home team", ALL_TEAMS, index=home_default,
+        home_default = team_pool.index("Argentina") if "Argentina" in team_pool else 0
+        home_team = st.selectbox("Home team", team_pool, index=home_default,
                                   format_func=lambda t: f"{FLAGS.get(t, '')} {t}".strip())
     with cmid:
         st.markdown("<div style='text-align:center;padding-top:2rem;font-size:1.5rem'>vs</div>",
                     unsafe_allow_html=True)
     with c2:
-        away_default = ALL_TEAMS.index("France") if "France" in ALL_TEAMS else 1
-        away_team = st.selectbox("Away team", ALL_TEAMS, index=away_default,
+        away_default = team_pool.index("France") if "France" in team_pool else 1
+        away_team = st.selectbox("Away team", team_pool, index=away_default,
                                  format_func=lambda t: f"{FLAGS.get(t, '')} {t}".strip())
 
+    st.checkbox(f"Show all {len(ALL_TEAMS)} teams", key="show_all_teams",
+                help="Off: only the 48 WC 2026 participants")
     neutral = st.checkbox("Neutral venue (World Cup)", value=True)
 
     if home_team == away_team:
@@ -663,8 +668,14 @@ else:
     confs = sorted(elo_df["confederation"].dropna().unique())
     sel   = st.multiselect("Filter by confederation", confs, default=confs)
 
+    show_all_rank = st.checkbox(f"Show all {len(elo_df)} teams", value=False,
+                                help="Off: only the 48 WC 2026 participants")
+
     filtered = elo_df[elo_df["confederation"].isin(sel)].reset_index(drop=True)
-    top_n    = st.slider("Show top N teams", 10, min(100, len(filtered)), 30, step=5)
+    if not show_all_rank:
+        filtered = filtered[filtered["team"].isin(WC_TEAMS)].reset_index(drop=True)
+    slider_max = max(11, min(100, len(filtered)))
+    top_n    = st.slider("Show top N teams", 10, slider_max, min(30, slider_max), step=5)
     top_df   = filtered.head(top_n).copy()
     top_df["color"] = top_df["confederation"].map(CONF_COLOR).fillna(CONF_COLOR["Other"])
     top_df["wc2026"] = top_df["team"].isin(WC_TEAMS)
