@@ -151,10 +151,20 @@ def _bootstrap_if_needed() -> None:
 # ── page config ────────────────────────────────────────────────────────────
 
 st.set_page_config(
-    page_title="WC 2026 Predictor",
+    page_title="WC 2026 Predictor — Match & Tournament Analytics",
     page_icon="⚽",
     layout="wide",
     initial_sidebar_state="expanded",
+    menu_items={
+        "Get help": "https://github.com/amir42com/wc2026-predictor",
+        "Report a bug": "https://github.com/amir42com/wc2026-predictor/issues",
+        "About": (
+            "**WC 2026 Predictor** — XGBoost + Elo-prior blend trained on "
+            "49,000+ international matches (1872–2026). "
+            "Match predictions, Monte Carlo tournament simulation, and "
+            "SHAP explainability."
+        ),
+    },
 )
 
 _bootstrap_if_needed()
@@ -162,23 +172,170 @@ _bootstrap_if_needed()
 bundle, predictor, explainer, elo_df = load_resources()
 ALL_TEAMS = sorted(predictor._state.keys())
 
-# ── global styling: load Noto Color Emoji so flags render on Windows Chrome ─
-# IMPORTANT: Noto Color Emoji must come LAST in the font stack so it only
+# ── design system: "Midnight Pitch" ─────────────────────────────────────────
+# Deep navy surfaces + electric sky-blue accent (#4fc3f7), Sora for headings.
+# IMPORTANT: Noto Color Emoji must come LAST in every font stack so it only
 # activates for emoji codepoints — listing it first breaks digit/letter spacing.
+_BODY_FONT = ("-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, "
+              "sans-serif, 'Noto Color Emoji'")
+
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Noto+Color+Emoji&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Noto+Color+Emoji&display=swap');
+
+/* ── typography ── */
+h1, h2, h3 {
+    font-family: 'Sora', -apple-system, sans-serif !important;
+    letter-spacing: 0.01em;
+}
 [data-testid="stMetricLabel"],
 [data-testid="stSelectbox"] *,
 [data-testid="stDataFrameResizable"] * {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
                  Arial, sans-serif, "Noto Color Emoji" !important;
 }
+[data-testid="stMetricValue"] {
+    font-family: 'Sora', sans-serif, 'Noto Color Emoji' !important;
+    font-weight: 700;
+}
+
+/* ── metric cards ── */
+[data-testid="stMetric"] {
+    background: linear-gradient(160deg, #151d3b 0%, #10162e 100%);
+    border: 1px solid #26305a;
+    border-radius: 14px;
+    padding: 1rem 1.25rem;
+    transition: border-color .2s ease, transform .2s ease, box-shadow .2s ease;
+}
+[data-testid="stMetric"]:hover {
+    border-color: rgba(79, 195, 247, 0.55);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 24px rgba(79, 195, 247, 0.08);
+}
+[data-testid="stMetricLabel"] { color: #93a1c8; }
+
+/* ── tables ── */
+[data-testid="stDataFrameResizable"] {
+    border: 1px solid #26305a;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+/* ── buttons ── */
+[data-testid="stBaseButton-primary"] {
+    background: linear-gradient(90deg, #2196f3, #4fc3f7);
+    border: none;
+    border-radius: 10px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    transition: filter .15s ease, transform .15s ease;
+}
+[data-testid="stBaseButton-primary"]:hover {
+    filter: brightness(1.12);
+    transform: translateY(-1px);
+}
+[data-testid="stBaseButton-secondary"] {
+    border: 1px solid #26305a;
+    border-radius: 10px;
+    transition: border-color .15s ease;
+}
+[data-testid="stBaseButton-secondary"]:hover { border-color: #4fc3f7; }
+
+/* ── sidebar ── */
+[data-testid="stSidebar"] {
+    background: #0a0e27;
+    border-right: 1px solid #1d2547;
+}
+
+/* ── spacing & dividers ── */
+hr { border-color: #1d2547 !important; margin: 1.6rem 0 !important; }
+.block-container { padding-top: 2.2rem; }
+
+/* ── hero banner ── */
+.hero {
+    position: relative; overflow: hidden; text-align: center;
+    border-radius: 16px;
+    padding: 2.6rem 2rem 2.2rem 2rem;
+    margin-bottom: 1.5rem;
+    background: linear-gradient(135deg, #0a0e27 0%, #0d1b3e 40%, #0a1628 70%, #000 100%);
+    border: 1px solid rgba(79, 195, 247, 0.15);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+.hero::before {
+    content: ''; position: absolute; inset: 0;
+    background:
+        repeating-linear-gradient(90deg, transparent, transparent 49%, rgba(255,255,255,.03) 49%, rgba(255,255,255,.03) 51%),
+        repeating-linear-gradient(0deg,  transparent, transparent 49%, rgba(255,255,255,.03) 49%, rgba(255,255,255,.03) 51%);
+    background-size: 60px 60px;
+}
+.hero::after {
+    content: ''; position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 220px; height: 220px; border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+.hero > * { position: relative; z-index: 1; }
+.hero .hero-icon { font-size: 2.6rem; line-height: 1; }
+.hero h1 {
+    margin: 0.35rem 0 0.25rem 0;
+    font-size: clamp(1.6rem, 5vw, 2.5rem);
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    background: linear-gradient(90deg, #4fc3f7, #ffffff, #81d4fa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+.hero .hero-sub {
+    margin: 0;
+    font-size: clamp(0.8rem, 2.5vw, 1rem);
+    color: rgba(232, 236, 246, 0.6);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+.hero .hero-tag {
+    margin: 0.55rem 0 0 0;
+    font-size: clamp(0.75rem, 2vw, 0.9rem);
+    color: rgba(232, 236, 246, 0.38);
+    letter-spacing: 0.08em;
+}
 </style>
 """, unsafe_allow_html=True)
 
-# Noto Color Emoji last so Latin/digit glyphs come from system fonts, emoji from NotoColorEmoji
-_CHART_FONT = dict(family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif, 'Noto Color Emoji'")
+
+def hero(icon: str, title: str, subtitle: str, tagline: str) -> None:
+    """Page hero banner — single source of truth for the header treatment."""
+    st.markdown(f"""
+<div class="hero">
+  <div class="hero-icon">{icon}</div>
+  <h1>{title}</h1>
+  <p class="hero-sub">{subtitle}</p>
+  <p class="hero-tag">{tagline}</p>
+</div>
+""", unsafe_allow_html=True)
+
+
+# ── shared Plotly template: every chart inherits fonts/colors from here ─────
+import plotly.io as pio
+
+_tpl = go.layout.Template()
+_tpl.layout = go.Layout(
+    font=dict(family=_BODY_FONT, color="#cdd6ee", size=13),
+    title_font=dict(family="'Sora', sans-serif", color="#e8ecf6", size=18),
+    paper_bgcolor="rgba(0,0,0,0)",
+    plot_bgcolor="rgba(0,0,0,0)",
+    xaxis=dict(gridcolor="#1d2547", zerolinecolor="#2a3560",
+               linecolor="#26305a", title_font=dict(color="#93a1c8")),
+    yaxis=dict(gridcolor="#1d2547", zerolinecolor="#2a3560",
+               linecolor="#26305a", title_font=dict(color="#93a1c8")),
+    hoverlabel=dict(bgcolor="#151d3b", bordercolor="#4fc3f7",
+                    font=dict(family=_BODY_FONT, color="#e8ecf6")),
+    colorway=["#4fc3f7", "#2ecc71", "#f39c12", "#e74c3c", "#9b59b6", "#1abc9c"],
+)
+pio.templates["wc2026"] = _tpl
+pio.templates.default = "wc2026"
+
+_PLOTLY_CONFIG = {"displayModeBar": False}
 
 # ── sidebar navigation ─────────────────────────────────────────────────────
 
@@ -201,63 +358,9 @@ st.sidebar.caption(
 # ══════════════════════════════════════════════════════════════════════════
 
 if page == "Match Predictor":
-    st.markdown("""
-<div style="
-    background: linear-gradient(135deg, #0a0e27 0%, #0d1b3e 40%, #0a1628 70%, #000000 100%);
-    border-radius: 14px;
-    padding: 2.4rem 2rem 2rem 2rem;
-    margin-bottom: 1.4rem;
-    position: relative;
-    overflow: hidden;
-    border: 1px solid rgba(255,255,255,0.07);
-    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-">
-  <!-- faint pitch lines -->
-  <div style="
-      position:absolute; inset:0;
-      background:
-        repeating-linear-gradient(90deg, transparent, transparent 49%, rgba(255,255,255,0.03) 49%, rgba(255,255,255,0.03) 51%),
-        repeating-linear-gradient(0deg,  transparent, transparent 49%, rgba(255,255,255,0.03) 49%, rgba(255,255,255,0.03) 51%);
-      background-size: 60px 60px;
-      border-radius:14px;
-  "></div>
-  <!-- centre circle -->
-  <div style="
-      position:absolute; top:50%; left:50%;
-      transform:translate(-50%,-50%);
-      width:220px; height:220px;
-      border-radius:50%;
-      border:1px solid rgba(255,255,255,0.05);
-  "></div>
-  <!-- content -->
-  <div style="position:relative; text-align:center;">
-    <div style="font-size:2.6rem; line-height:1;">⚽</div>
-    <h1 style="
-        margin: 0.3rem 0 0.2rem 0;
-        font-size: clamp(1.6rem, 5vw, 2.6rem);
-        font-weight: 800;
-        letter-spacing: 0.04em;
-        background: linear-gradient(90deg, #4fc3f7, #ffffff, #81d4fa);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-    ">FIFA WORLD CUP 2026</h1>
-    <p style="
-        margin: 0;
-        font-size: clamp(0.8rem, 2.5vw, 1rem);
-        color: rgba(255,255,255,0.55);
-        letter-spacing: 0.12em;
-        text-transform: uppercase;
-    ">United States &nbsp;·&nbsp; Canada &nbsp;·&nbsp; Mexico</p>
-    <p style="
-        margin: 0.5rem 0 0 0;
-        font-size: clamp(0.75rem, 2vw, 0.9rem);
-        color: rgba(255,255,255,0.38);
-        letter-spacing: 0.08em;
-    ">June 11 – July 19, 2026</p>
-  </div>
-</div>
-""", unsafe_allow_html=True)
+    hero("⚽", "FIFA WORLD CUP 2026",
+         "United States &nbsp;·&nbsp; Canada &nbsp;·&nbsp; Mexico",
+         "June 11 – July 19, 2026")
 
     # ── team selectors ─────────────────────────────────────────────────────
     c1, cmid, c2 = st.columns([5, 1, 5])
@@ -338,7 +441,7 @@ if page == "Match Predictor":
         xaxis=dict(showticklabels=False, range=[0, 1]),
         yaxis=dict(showticklabels=False),
     )
-    st.plotly_chart(fig_bar, use_container_width=True)
+    st.plotly_chart(fig_bar, use_container_width=True, config=_PLOTLY_CONFIG)
 
     # ── team comparison ────────────────────────────────────────────────────
     st.subheader("Team comparison")
@@ -404,9 +507,8 @@ if page == "Match Predictor":
         height=480,
         margin=dict(l=10, r=20, t=45, b=40),
         yaxis=dict(automargin=True),
-        font=_CHART_FONT,
     )
-    st.plotly_chart(fig_shap, use_container_width=True)
+    st.plotly_chart(fig_shap, use_container_width=True, config=_PLOTLY_CONFIG)
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -414,60 +516,9 @@ if page == "Match Predictor":
 # ══════════════════════════════════════════════════════════════════════════
 
 elif page == "Tournament Simulator":
-    st.markdown("""
-<div style="
-    background: linear-gradient(135deg, #0a0e27 0%, #0d1b3e 40%, #0a1628 70%, #000000 100%);
-    border-radius: 14px;
-    padding: 2.4rem 2rem 2rem 2rem;
-    margin-bottom: 1.4rem;
-    position: relative;
-    overflow: hidden;
-    border: 1px solid rgba(255,255,255,0.07);
-    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-">
-  <div style="
-      position:absolute; inset:0;
-      background:
-        repeating-linear-gradient(90deg, transparent, transparent 49%, rgba(255,255,255,0.03) 49%, rgba(255,255,255,0.03) 51%),
-        repeating-linear-gradient(0deg,  transparent, transparent 49%, rgba(255,255,255,0.03) 49%, rgba(255,255,255,0.03) 51%);
-      background-size: 60px 60px;
-      border-radius:14px;
-  "></div>
-  <div style="
-      position:absolute; top:50%; left:50%;
-      transform:translate(-50%,-50%);
-      width:220px; height:220px;
-      border-radius:50%;
-      border:1px solid rgba(255,255,255,0.05);
-  "></div>
-  <div style="position:relative; text-align:center;">
-    <div style="font-size:2.6rem; line-height:1;">🏆</div>
-    <h1 style="
-        margin: 0.3rem 0 0.2rem 0;
-        font-size: clamp(1.6rem, 5vw, 2.6rem);
-        font-weight: 800;
-        letter-spacing: 0.04em;
-        background: linear-gradient(90deg, #4fc3f7, #ffffff, #81d4fa);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-    ">TOURNAMENT SIMULATOR</h1>
-    <p style="
-        margin: 0;
-        font-size: clamp(0.8rem, 2.5vw, 1rem);
-        color: rgba(255,255,255,0.55);
-        letter-spacing: 0.12em;
-        text-transform: uppercase;
-    ">Monte Carlo Simulation &nbsp;·&nbsp; 48 Teams &nbsp;·&nbsp; Full Bracket</p>
-    <p style="
-        margin: 0.5rem 0 0 0;
-        font-size: clamp(0.75rem, 2vw, 0.9rem);
-        color: rgba(255,255,255,0.38);
-        letter-spacing: 0.08em;
-    ">June 11 – July 19, 2026</p>
-  </div>
-</div>
-""", unsafe_allow_html=True)
+    hero("🏆", "TOURNAMENT SIMULATOR",
+         "Monte Carlo Simulation &nbsp;·&nbsp; 48 Teams &nbsp;·&nbsp; Full Bracket",
+         "June 11 – July 19, 2026")
 
     ctrl_l, ctrl_r = st.columns([3, 2])
     with ctrl_l:
@@ -527,9 +578,8 @@ elif page == "Tournament Simulator":
         margin=dict(t=20, b=30, l=175, r=55),
         xaxis=dict(range=[0, dw["pct"].max() * 1.35], automargin=True),
         yaxis=dict(automargin=True),
-        font=_CHART_FONT,
     )
-    st.plotly_chart(fig_wins, use_container_width=True)
+    st.plotly_chart(fig_wins, use_container_width=True, config=_PLOTLY_CONFIG)
 
     # confederation legend
     legend_md = "  ".join(
@@ -589,60 +639,9 @@ elif page == "Tournament Simulator":
 # ══════════════════════════════════════════════════════════════════════════
 
 else:
-    st.markdown("""
-<div style="
-    background: linear-gradient(135deg, #0a0e27 0%, #0d1b3e 40%, #0a1628 70%, #000000 100%);
-    border-radius: 14px;
-    padding: 2.4rem 2rem 2rem 2rem;
-    margin-bottom: 1.4rem;
-    position: relative;
-    overflow: hidden;
-    border: 1px solid rgba(255,255,255,0.07);
-    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-">
-  <div style="
-      position:absolute; inset:0;
-      background:
-        repeating-linear-gradient(90deg, transparent, transparent 49%, rgba(255,255,255,0.03) 49%, rgba(255,255,255,0.03) 51%),
-        repeating-linear-gradient(0deg,  transparent, transparent 49%, rgba(255,255,255,0.03) 49%, rgba(255,255,255,0.03) 51%);
-      background-size: 60px 60px;
-      border-radius:14px;
-  "></div>
-  <div style="
-      position:absolute; top:50%; left:50%;
-      transform:translate(-50%,-50%);
-      width:220px; height:220px;
-      border-radius:50%;
-      border:1px solid rgba(255,255,255,0.05);
-  "></div>
-  <div style="position:relative; text-align:center;">
-    <div style="font-size:2.6rem; line-height:1;">📊</div>
-    <h1 style="
-        margin: 0.3rem 0 0.2rem 0;
-        font-size: clamp(1.6rem, 5vw, 2.6rem);
-        font-weight: 800;
-        letter-spacing: 0.04em;
-        background: linear-gradient(90deg, #4fc3f7, #ffffff, #81d4fa);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-    ">TEAM RANKINGS</h1>
-    <p style="
-        margin: 0;
-        font-size: clamp(0.8rem, 2.5vw, 1rem);
-        color: rgba(255,255,255,0.55);
-        letter-spacing: 0.12em;
-        text-transform: uppercase;
-    ">Elo Ratings &nbsp;·&nbsp; 49,000+ Matches &nbsp;·&nbsp; 1872–2026</p>
-    <p style="
-        margin: 0.5rem 0 0 0;
-        font-size: clamp(0.75rem, 2vw, 0.9rem);
-        color: rgba(255,255,255,0.38);
-        letter-spacing: 0.08em;
-    ">336 national teams ranked by predictive strength</p>
-  </div>
-</div>
-""", unsafe_allow_html=True)
+    hero("📊", "TEAM RANKINGS",
+         "Elo Ratings &nbsp;·&nbsp; 49,000+ Matches &nbsp;·&nbsp; 1872–2026",
+         "336 national teams ranked by predictive strength")
 
     confs = sorted(elo_df["confederation"].dropna().unique())
     sel   = st.multiselect("Filter by confederation", confs, default=confs)
@@ -675,9 +674,8 @@ else:
         margin=dict(t=20, b=30, l=175, r=55),
         xaxis=dict(range=[td["elo"].min() * 0.97, td["elo"].max() * 1.1], automargin=True),
         yaxis=dict(automargin=True),
-        font=_CHART_FONT,
     )
-    st.plotly_chart(fig_elo, use_container_width=True)
+    st.plotly_chart(fig_elo, use_container_width=True, config=_PLOTLY_CONFIG)
 
     legend_md = "  ".join(
         f"<span style='color:{c}'>&#9632;</span> {conf}"
