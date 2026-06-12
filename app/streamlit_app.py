@@ -151,7 +151,7 @@ def _bootstrap_if_needed() -> None:
 # ── page config ────────────────────────────────────────────────────────────
 
 st.set_page_config(
-    page_title="WC 2026 Predictor — Match & Tournament Analytics",
+    page_title="WC 2026 Predictor · Amir Mohammadi",
     page_icon="⚽",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -235,6 +235,18 @@ h1, h2, h3 {
 
 /* hide element toolbars (fullscreen/download/search) — they break mobile touch */
 [data-testid="stElementToolbar"] { display: none !important; }
+
+/* ── sidebar credits ── */
+.credits { font-size: 0.78rem; line-height: 1.5; }
+.credits p { margin: 0 0 0.25rem 0; }
+.credits-name { color: #8a93ad; font-weight: 600; }
+.credits-links a {
+    color: #8a93ad !important;
+    text-decoration: none;
+    transition: color .15s ease;
+}
+.credits-links a:hover { color: #4fc3f7 !important; }
+.credits-version { color: #5b6379; font-size: 0.72rem; }
 
 /* ── buttons ── */
 [data-testid="stBaseButton-primary"] {
@@ -368,6 +380,20 @@ st.sidebar.caption(
     f"{len(bundle['feature_cols'])} features · "
     "data up to 2026-06-10"
 )
+
+# ── credits ──────────────────────────────────────────────────────────────
+st.sidebar.markdown("---")
+st.sidebar.markdown("""
+<div class="credits">
+  <p class="credits-name">Built by Amir Mohammadi</p>
+  <p class="credits-links">
+    <a href="https://amir42.com" target="_blank">🌐 Portfolio</a> ·
+    <a href="https://www.linkedin.com/in/amir42com/" target="_blank">💼 LinkedIn</a> ·
+    <a href="https://github.com/amir42com/wc2026-predictor" target="_blank">💻 GitHub</a>
+  </p>
+  <p class="credits-version">v1.2 · June 2026</p>
+</div>
+""", unsafe_allow_html=True)
 
 
 # ══════════════════════════════════════════════════════════════════════════
