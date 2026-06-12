@@ -196,7 +196,8 @@ class Predictor:
             elo_a = self._state.get(a, self._default_state())["elo"]
             elo_b = self._state.get(b, self._default_state())["elo"]
             prior = elo_prior_proba(elo_a, elo_b)
-            self._cache[key] = ELO_BLEND_W * p_model + (1 - ELO_BLEND_W) * prior
+            blended = ELO_BLEND_W * p_model + (1 - ELO_BLEND_W) * prior
+            self._cache[key] = blended / blended.sum()
 
         p = self._cache[key]
         a = min(team_a, team_b)
@@ -204,6 +205,16 @@ class Predictor:
 
 
 # ── Group-stage helpers ────────────────────────────────────────────────────
+
+def _safe_p(p: np.ndarray) -> np.ndarray:
+    """Sanitize a probability vector for rng.choice: no NaN/negatives, sums to 1."""
+    p = np.nan_to_num(np.asarray(p, dtype=float), nan=0.0)
+    p = np.clip(p, 0.0, None)
+    s = p.sum()
+    if s <= 0:
+        return np.full(len(p), 1.0 / len(p))
+    return p / s
+
 
 def _score_for_outcome(outcome: int, rng: np.random.Generator) -> tuple[int, int]:
     """Sample a plausible scoreline given the match outcome (0/1/2)."""
@@ -230,7 +241,7 @@ def simulate_group(
     h2h_gd:  dict[str, dict[str, int]] = {t: {o: 0 for o in teams if o != t} for t in teams}
 
     for home, away in combinations(teams, 2):
-        p = predictor.predict(home, away)
+        p = _safe_p(predictor.predict(home, away))
         outcome = int(rng.choice(3, p=p))
         hg, ag = _score_for_outcome(outcome, rng)
 
@@ -329,7 +340,7 @@ def knockout_match(
     rng: np.random.Generator,
 ) -> str:
     """Simulate a single-elimination match.  Draws go to a penalty coin-flip."""
-    p = predictor.predict(team_a, team_b)
+    p = _safe_p(predictor.predict(team_a, team_b))
     outcome = int(rng.choice(3, p=p))
     if outcome == 0:
         return team_a
