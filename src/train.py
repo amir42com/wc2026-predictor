@@ -41,6 +41,20 @@ LABEL_MAP = {0: "Home win", 1: "Draw", 2: "Away win"}
 
 WC_BACKTEST_YEARS = [2010, 2014, 2018, 2022]
 
+# Production ensemble: blend XGB probabilities with an Elo-logistic prior.
+# Beats both raw XGB and the naive Elo baseline on WC log-loss/Brier; weight
+# tuned on WC 2006/2010 only (see notebooks/04_model_improvement.md).
+ELO_BLEND_W   = 0.75   # XGB share of the blend
+ELO_DRAW_RATE = 0.227  # historical draw share used by the prior
+
+
+def elo_prior_proba(elo_home: float, elo_away: float,
+                    draw_rate: float = ELO_DRAW_RATE) -> np.ndarray:
+    """Elo-logistic (win, draw, loss) prior with a fixed draw share."""
+    e = 1.0 / (1.0 + 10.0 ** ((elo_away - elo_home) / 400.0))
+    p = np.array([(1 - draw_rate) * e, draw_rate, (1 - draw_rate) * (1 - e)])
+    return p / p.sum()
+
 
 def make_X(df: pd.DataFrame, feature_cols: list[str] | None = None) -> tuple[pd.DataFrame, list[str]]:
     """
