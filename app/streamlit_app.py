@@ -213,6 +213,12 @@ h1, h2, h3 {
 }
 [data-testid="stMetricLabel"] { color: #93a1c8; }
 
+/* identity-color accents linking metric cards to the probability bar:
+   col 1 = home (blue), col 2 = draw (gray), col 3 = away (amber) */
+[data-testid="stColumn"]:nth-of-type(1) [data-testid="stMetric"] { border-left: 4px solid #3b82f6; }
+[data-testid="stColumn"]:nth-of-type(2) [data-testid="stMetric"] { border-left: 4px solid #6b7280; }
+[data-testid="stColumn"]:nth-of-type(3) [data-testid="stMetric"] { border-left: 4px solid #f59e0b; }
+
 /* ── tables ── */
 [data-testid="stTable"] {
     border: 1px solid #26305a;
@@ -237,16 +243,22 @@ h1, h2, h3 {
 [data-testid="stElementToolbar"] { display: none !important; }
 
 /* ── sidebar credits ── */
-.credits { font-size: 0.78rem; line-height: 1.5; }
-.credits p { margin: 0 0 0.25rem 0; }
+.credits { font-size: 0.85rem; line-height: 1.6; }
+.credits p { margin: 0 0 0.3rem 0; }
 .credits-name { color: #8a93ad; font-weight: 600; }
 .credits-links a {
     color: #8a93ad !important;
     text-decoration: none;
     transition: color .15s ease;
+    white-space: nowrap;
 }
 .credits-links a:hover { color: #4fc3f7 !important; }
-.credits-version { color: #5b6379; font-size: 0.72rem; }
+.credits-links svg {
+    width: 16px; height: 16px;
+    vertical-align: -3px;
+    margin-right: 3px;
+}
+.credits-version { color: #5b6379; font-size: 0.78rem; }
 
 /* ── buttons ── */
 [data-testid="stBaseButton-primary"] {
@@ -273,6 +285,11 @@ h1, h2, h3 {
     background: #0a0e27;
     border-right: 1px solid #1d2547;
 }
+[data-testid="stSidebar"] [data-testid="stRadio"] label p { font-size: 1rem; }
+[data-testid="stSidebar"] [data-testid="stCaptionContainer"] p { font-size: 0.85rem; }
+
+/* main-page captions: keep body text readable (never below 0.9rem) */
+[data-testid="stMain"] [data-testid="stCaptionContainer"] p { font-size: 0.9rem; }
 
 /* ── spacing & dividers ── */
 hr { border-color: #1d2547 !important; margin: 1.6rem 0 !important; }
@@ -382,14 +399,41 @@ st.sidebar.caption(
 )
 
 # ── credits ──────────────────────────────────────────────────────────────
+_ICON_GLOBE = (
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" '
+    'stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/>'
+    '<line x1="2" y1="12" x2="22" y2="12"/>'
+    '<path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 '
+    '15.3 15.3 0 0 1 4-10z"/></svg>'
+)
+_ICON_LINKEDIN = (
+    '<svg viewBox="0 0 24 24" fill="currentColor">'
+    '<path d="M20.45 20.45h-3.55v-5.57c0-1.33-.03-3.04-1.85-3.04-1.85 0-2.14 1.45-2.14 '
+    '2.94v5.67H9.36V9h3.41v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 '
+    '5.46v6.28zM5.34 7.43a2.06 2.06 0 1 1 0-4.12 2.06 2.06 0 0 1 0 4.12zM7.12 '
+    '20.45H3.56V9h3.56v11.45zM22.22 0H1.77C.79 0 0 .77 0 1.72v20.55C0 23.22.79 24 '
+    '1.77 24h20.45c.98 0 1.78-.78 1.78-1.73V1.72C24 .77 23.2 0 22.22 0z"/></svg>'
+)
+_ICON_GITHUB = (
+    '<svg viewBox="0 0 16 16" fill="currentColor">'
+    '<path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 '
+    '0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-'
+    '.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-'
+    '1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 '
+    '.67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 '
+    '1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 '
+    '1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-'
+    '8-8z"/></svg>'
+)
+
 st.sidebar.markdown("---")
-st.sidebar.markdown("""
+st.sidebar.markdown(f"""
 <div class="credits">
   <p class="credits-name">Built by Amir Mohammadi</p>
   <p class="credits-links">
-    <a href="https://amir42.com" target="_blank">🌐 Portfolio</a> ·
-    <a href="https://www.linkedin.com/in/amir42com/" target="_blank">💼 LinkedIn</a> ·
-    <a href="https://github.com/amir42com/wc2026-predictor" target="_blank">💻 GitHub</a>
+    <a href="https://amir42.com" target="_blank">{_ICON_GLOBE} Portfolio</a> ·
+    <a href="https://www.linkedin.com/in/amir42com/" target="_blank">{_ICON_LINKEDIN} LinkedIn</a> ·
+    <a href="https://github.com/amir42com/wc2026-predictor" target="_blank">{_ICON_GITHUB} GitHub</a>
   </p>
   <p class="credits-version">v1.2 · June 2026</p>
 </div>
@@ -474,14 +518,22 @@ if page == "Match Predictor":
     mc2.metric("Draw",             f"{proba[1]*100:.1f}%")
     mc3.metric(outcome_labels[2], f"{proba[2]*100:.1f}%")
 
-    # Stacked probability bar
+    # Stacked probability bar — identity colors (home blue / draw gray /
+    # away amber), not good/bad semantics; flags make segments self-explanatory
+    OUTCOME_COLORS = ["#3b82f6", "#6b7280", "#f59e0b"]
+    bar_texts = [
+        f"{FLAGS.get(home_team, '')} {proba[0]*100:.1f}%".strip(),
+        f"{proba[1]*100:.1f}%",
+        f"{FLAGS.get(away_team, '')} {proba[2]*100:.1f}%".strip(),
+    ]
     fig_bar = go.Figure()
-    for i, (label, color) in enumerate(zip(outcome_labels, ["#2ecc71", "#f39c12", "#e74c3c"])):
+    for i, (label, color) in enumerate(zip(outcome_labels, OUTCOME_COLORS)):
         fig_bar.add_trace(go.Bar(
             x=[proba[i]], y=[""], orientation="h",
             name=label, marker_color=color,
-            text=f"{proba[i]*100:.1f}%", textposition="inside",
+            text=bar_texts[i], textposition="inside",
             insidetextanchor="middle",
+            insidetextfont=dict(size=14, color="#ffffff"),
         ))
     fig_bar.update_layout(
         barmode="stack", height=70, showlegend=False,
