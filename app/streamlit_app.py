@@ -189,8 +189,7 @@ h1, h2, h3 {
     letter-spacing: 0.01em;
 }
 [data-testid="stMetricLabel"],
-[data-testid="stSelectbox"] *,
-[data-testid="stDataFrameResizable"] * {
+[data-testid="stSelectbox"] * {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
                  Arial, sans-serif, "Noto Color Emoji" !important;
 }
@@ -215,11 +214,27 @@ h1, h2, h3 {
 [data-testid="stMetricLabel"] { color: #93a1c8; }
 
 /* ── tables ── */
-[data-testid="stDataFrameResizable"] {
+[data-testid="stTable"] {
     border: 1px solid #26305a;
     border-radius: 12px;
     overflow: hidden;
 }
+[data-testid="stTable"] table {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                 Arial, sans-serif, "Noto Color Emoji" !important;
+    font-size: 0.92rem;
+}
+[data-testid="stTable"] th {
+    color: #93a1c8 !important;
+    font-weight: 600;
+    background: #10162e;
+    border-bottom: 1px solid #26305a !important;
+}
+[data-testid="stTable"] td { border-color: #1d2547 !important; }
+[data-testid="stTable"] tbody tr:hover td { background: rgba(79,195,247,0.05); }
+
+/* hide element toolbars (fullscreen/download/search) — they break mobile touch */
+[data-testid="stElementToolbar"] { display: none !important; }
 
 /* ── buttons ── */
 [data-testid="stBaseButton-primary"] {
@@ -335,7 +350,9 @@ _tpl.layout = go.Layout(
 pio.templates["wc2026"] = _tpl
 pio.templates.default = "wc2026"
 
-_PLOTLY_CONFIG = {"displayModeBar": False}
+# staticPlot: charts render as static images so they don't capture touch
+# events on mobile (all values are labeled on the bars; hover isn't needed)
+_PLOTLY_CONFIG = {"staticPlot": True}
 
 # ── sidebar navigation ─────────────────────────────────────────────────────
 
@@ -466,7 +483,7 @@ if page == "Match Predictor":
             as_["confederation"],
         ],
     }).set_index("")
-    st.dataframe(comp_df, use_container_width=True)
+    st.table(comp_df)
 
     if n_h2h > 0:
         hw_n = round(hwr * n_h2h)
@@ -631,7 +648,7 @@ elif page == "Tournament Simulator":
             with cols[idx % 3]:
                 st.markdown(f"**Group {grp}**")
                 sub = gs_df[gs_df["Group"] == grp][["Team","Top-2 qual %","3rd place %"]].set_index("Team")
-                st.dataframe(sub, use_container_width=True)
+                st.table(sub)
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -699,5 +716,6 @@ else:
     wc_df.insert(0, "Group", wc_df["Team"].map(team_to_group))
     wc_df.insert(1, "Flag", wc_df["Team"].map(lambda t: FLAGS.get(t, "")))
     wc_df = wc_df.sort_values("Group")
+    wc_df["Elo"] = wc_df["Elo"].map("{:.1f}".format)
 
-    st.dataframe(wc_df, use_container_width=True, height=600)
+    st.table(wc_df)
