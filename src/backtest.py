@@ -23,7 +23,7 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import accuracy_score, log_loss
 
-from train import make_X, train_model
+from train import ELO_BLEND_W, make_X, train_model
 
 PROCESSED_DIR = Path(__file__).resolve().parents[1] / "data" / "processed"
 
@@ -84,17 +84,21 @@ def backtest(df: pd.DataFrame) -> pd.DataFrame:
         X_wc, _ = make_X(df_wc, feature_cols)
         y_wc = df_wc["outcome"].values
 
-        model_metrics = evaluate_proba(y_wc, model.predict_proba(X_wc))
-
         # Baseline draw rate from the same pre-tournament window — no leakage
         draw_rate = float((df_pre["outcome"] == 1).mean())
-        base_metrics = evaluate_proba(y_wc, elo_baseline_proba(df_wc, draw_rate))
+        base_proba = elo_baseline_proba(df_wc, draw_rate)
+
+        # Production model = XGB blended with the Elo prior (weight tuned on
+        # WC 2006/2010 — see notebooks/04_model_improvement.md)
+        model_proba = (ELO_BLEND_W * model.predict_proba(X_wc)
+                       + (1 - ELO_BLEND_W) * base_proba)
 
         rows.append({"tournament": f"WC {year}", "n": len(df_wc),
-                     "model": model_metrics, "base": base_metrics,
+                     "model": evaluate_proba(y_wc, model_proba),
+                     "base":  evaluate_proba(y_wc, base_proba),
                      "y": y_wc,
-                     "model_proba": model.predict_proba(X_wc),
-                     "base_proba": elo_baseline_proba(df_wc, draw_rate)})
+                     "model_proba": model_proba,
+                     "base_proba": base_proba})
 
     # Combined: pool all matches so per-sample metrics are exact
     y_all     = np.concatenate([r["y"] for r in rows])
@@ -110,7 +114,7 @@ def backtest(df: pd.DataFrame) -> pd.DataFrame:
 def print_table(rows: list) -> None:
     W = 78
     print()
-    print("WC Backtest - model vs naive Elo baseline".center(W))
+    print("WC Backtest - production model (XGB+Elo blend) vs naive Elo baseline".center(W))
     print("(each model trained only on matches before that tournament)".center(W))
     print("=" * W)
     print(f"{'':14}{'':>4}  |{'Model':^28} |{'Elo baseline':^28}")

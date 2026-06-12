@@ -23,7 +23,7 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from train import make_X
+from train import ELO_BLEND_W, elo_prior_proba, make_X
 
 PROCESSED_DIR = Path(__file__).resolve().parents[1] / "data" / "processed"
 MODELS_DIR    = Path(__file__).resolve().parents[1] / "models"
@@ -191,7 +191,12 @@ class Predictor:
             p_ab   = self._raw_proba(a, b)
             p_ba   = self._raw_proba(b, a)
             # Average both orderings to cancel any residual home-field asymmetry
-            self._cache[key] = (p_ab + p_ba[[2, 1, 0]]) / 2  # stored as (a_win, draw, b_win)
+            p_model = (p_ab + p_ba[[2, 1, 0]]) / 2  # (a_win, draw, b_win)
+            # Shrink toward the Elo-logistic prior (improves WC calibration)
+            elo_a = self._state.get(a, self._default_state())["elo"]
+            elo_b = self._state.get(b, self._default_state())["elo"]
+            prior = elo_prior_proba(elo_a, elo_b)
+            self._cache[key] = ELO_BLEND_W * p_model + (1 - ELO_BLEND_W) * prior
 
         p = self._cache[key]
         a = min(team_a, team_b)

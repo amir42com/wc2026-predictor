@@ -109,6 +109,25 @@ def build_features(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     # h2h key: tuple(sorted([home, away])) — stores raw results for lookback
     h2h: dict[tuple, list] = defaultdict(list)
 
+    # Extended state (rest days, competitive form, qualification record, stage)
+    last_date: dict[str, pd.Timestamp] = {}
+    comp_form: dict[str, deque] = defaultdict(lambda: deque(maxlen=10))
+    qual_hist: dict[str, deque] = defaultdict(deque)   # (date, won) within 730 days
+    tourn_n: dict[tuple, int] = defaultdict(int)        # (team, tournament, year) -> matches played
+
+    def _days_since(team: str, date: pd.Timestamp) -> int:
+        if team not in last_date:
+            return 365
+        return min((date - last_date[team]).days, 365)
+
+    def _qual_wr(team: str, date: pd.Timestamp) -> float:
+        q = qual_hist[team]
+        while q and (date - q[0][0]).days > 730:
+            q.popleft()
+        if not q:
+            return 0.5
+        return sum(w for _, w in q) / len(q)
+
     # Confederation Elo: running sum + count of every registered team
     conf_sum: dict[str, float] = defaultdict(float)
     conf_cnt: dict[str, int] = defaultdict(int)
@@ -158,6 +177,13 @@ def build_features(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
             h2h_hw = h2h_d = h2h_aw = 0
             h2h_hwr = 0.5
 
+        tourn_year = (m["tournament"], m["date"].year)
+        is_comp = m["tournament"] != "Friendly"
+        is_qual = "qualification" in str(m["tournament"]).lower()
+
+        h_comp_wr, _ = _form_stats(list(comp_form[home]))
+        a_comp_wr, _ = _form_stats(list(comp_form[away]))
+
         rows.append({
             "date": m["date"],
             "home_team": home,
@@ -185,6 +211,14 @@ def build_features(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
             "home_conf_elo": round(_conf_elo(h_conf), 2),
             "away_conf_elo": round(_conf_elo(a_conf), 2),
             "is_world_cup": int(m["tournament"] == "FIFA World Cup"),
+            "home_days_since_last": _days_since(home, m["date"]),
+            "away_days_since_last": _days_since(away, m["date"]),
+            "home_comp_wr_10": round(h_comp_wr, 4),
+            "away_comp_wr_10": round(a_comp_wr, 4),
+            "home_qual_wr": round(_qual_wr(home, m["date"]), 4),
+            "away_qual_wr": round(_qual_wr(away, m["date"]), 4),
+            "home_tourn_match_n": tourn_n[(home, *tourn_year)],
+            "away_tourn_match_n": tourn_n[(away, *tourn_year)],
             "outcome": 0 if hs > as_ else (1 if hs == as_ else 2),
         })
 
@@ -199,6 +233,16 @@ def build_features(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
         form[home].append((hs, as_))
         form[away].append((as_, hs))
         h2h[pair].append({"h": home, "hs": hs, "as": as_})
+
+        last_date[home] = last_date[away] = m["date"]
+        if is_comp:
+            comp_form[home].append((hs, as_))
+            comp_form[away].append((as_, hs))
+        if is_qual:
+            qual_hist[home].append((m["date"], 1.0 if hs > as_ else (0.5 if hs == as_ else 0.0)))
+            qual_hist[away].append((m["date"], 1.0 if as_ > hs else (0.5 if hs == as_ else 0.0)))
+        tourn_n[(home, *tourn_year)] += 1
+        tourn_n[(away, *tourn_year)] += 1
 
     features = pd.DataFrame(rows)
     elo_df = (
