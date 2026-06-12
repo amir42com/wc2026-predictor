@@ -16,7 +16,7 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from simulate import GROUPS, Predictor, monte_carlo, simulate_group, resolve_r32
-from train import make_X
+from train import ELO_BLEND_W, elo_prior_proba, make_X
 
 PROCESSED_DIR = Path(__file__).resolve().parents[1] / "data" / "processed"
 MODELS_DIR    = Path(__file__).resolve().parents[1] / "models"
@@ -190,7 +190,7 @@ page = st.sidebar.radio(
 
 st.sidebar.markdown("---")
 st.sidebar.caption(
-    "Model: XGBoost · "
+    "Model: XGBoost + Elo prior blend (0.75/0.25) · "
     f"{len(bundle['feature_cols'])} features · "
     "data up to 2026-06-10"
 )
@@ -307,6 +307,8 @@ if page == "Match Predictor":
     }
     X, _ = make_X(pd.DataFrame([feat_row]), bundle["feature_cols"])
     proba = bundle["model"].predict_proba(X)[0]   # [p_home_win, p_draw, p_away_win]
+    # Production blend: shrink toward the Elo-logistic prior (same as simulator)
+    proba = ELO_BLEND_W * proba + (1 - ELO_BLEND_W) * elo_prior_proba(hs["elo"], as_["elo"])
     predicted_class = int(proba.argmax())
     outcome_labels  = [
         f"{FLAGS.get(home_team, '')} {home_team} Win".strip(),
