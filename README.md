@@ -65,6 +65,16 @@ python src/train.py
 streamlit run app/streamlit_app.py
 ```
 
+### 5. (For contributors) Enable the pre-push smoke test
+
+One-time setup — runs `src/smoke_test.py` automatically before every push:
+
+```bash
+git config core.hooksPath scripts
+```
+
+Bypass with `git push --no-verify` when needed.
+
 ## Dataset
 
 [International football results (1872–present)](https://github.com/martj42/international_results) — Mart Jürisoo, GitHub.
