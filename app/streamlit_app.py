@@ -665,34 +665,121 @@ if page == "Match Predictor":
         )
 
     # ── SHAP explanation ───────────────────────────────────────────────────
-    st.subheader("What pushed this prediction?")
+    # Explain relative to the FAVOURED team's win class so positive bars
+    # always mean "pushes toward the favourite".
+    fav_is_home = proba[0] >= proba[2]
+    fav_team  = home_team if fav_is_home else away_team
+    opp_team  = away_team if fav_is_home else home_team
+    fav_color = OUTCOME_COLORS[0] if fav_is_home else OUTCOME_COLORS[2]
+    opp_color = OUTCOME_COLORS[2] if fav_is_home else OUTCOME_COLORS[0]
+    fav_class = 0 if fav_is_home else 2
+
+    st.subheader(f"Why is {fav_team} favoured?")
+
+    sv = explainer.shap_values(X)  # shape (n_samples, n_features, n_classes)
+    sv_series = pd.Series(sv[0, :, fav_class], index=bundle["feature_cols"])
+    xrow = X.iloc[0]
+
+    def _side(f: str) -> str:
+        """Team a feature belongs to (home/away prefix), else the home team."""
+        return away_team if f.startswith(("away_", "a_conf_")) else home_team
+
+    def _value_label(f: str) -> str:
+        """Axis label: human name + the actual value, with team names."""
+        v = float(xrow[f])
+        if f == "elo_diff":
+            stronger = home_team if v > 0 else away_team
+            return f"Team strength gap: {stronger} +{abs(v):.0f} Elo"
+        if f in ("home_elo", "away_elo"):
+            return f"{_side(f)} strength: {v:.0f} Elo"
+        if "_win_rate_" in f:
+            return f"{_side(f)} win rate, last {f.rsplit('_', 1)[1]}: {v*100:.0f}%"
+        if "_gd_" in f:
+            return f"{_side(f)} goal diff, last {f.rsplit('_', 1)[1]}: {v:+.1f}"
+        if f == "h2h_n":
+            return f"Head-to-head games played: {v:.0f}"
+        if f == "h2h_home_wr":
+            return f"Head-to-head: {home_team} wins {v*100:.0f}%"
+        if f in ("home_conf_elo", "away_conf_elo"):
+            return f"{_side(f)} confederation strength: {v:.0f}"
+        if f == "neutral":
+            return f"Neutral venue: {'yes' if v else 'no'}"
+        if f == "is_world_cup":
+            return f"World Cup match: {'yes' if v else 'no'}"
+        if f.startswith(("h_conf_", "a_conf_")):
+            conf = f.split("_", 2)[2]
+            return f"{_side(f)}: {conf} team" + ("" if v else " (not)")
+        return FEATURE_LABELS.get(f, f)
+
+    def _fragment(f: str) -> str:
+        """Short phrase for the auto-generated summary sentence."""
+        v = float(xrow[f])
+        if f == "elo_diff":
+            stronger = home_team if v > 0 else away_team
+            return f"{stronger}'s +{abs(v):.0f} Elo advantage"
+        if f in ("home_elo", "away_elo"):
+            return f"{_side(f)}'s overall strength ({v:.0f} Elo)"
+        if "_win_rate_" in f:
+            return (f"{_side(f)}'s recent form "
+                    f"({v*100:.0f}% wins in the last {f.rsplit('_', 1)[1]})")
+        if "_gd_" in f:
+            return f"{_side(f)}'s recent goal difference ({v:+.1f} per game)"
+        if f in ("h2h_n", "h2h_home_wr"):
+            return "the head-to-head record"
+        if f in ("home_conf_elo", "away_conf_elo"):
+            owner = _side(f)
+            favours_fav = sv_series[f] > 0
+            adj = "strong" if (favours_fav == (owner == fav_team)) else "weaker"
+            return f"{owner}'s {adj} confederation"
+        if f == "neutral":
+            return "the neutral venue"
+        if f == "is_world_cup":
+            return "it being a World Cup match"
+        if f.startswith(("h_conf_", "a_conf_")):
+            conf = f.split("_", 2)[2]
+            return f"{_side(f)} being a {CONF_FULL.get(conf, conf)} side"
+        return FEATURE_LABELS.get(f, f).lower()
+
+    # Auto-generated summary from the top 3 contributors
+    top3 = sv_series.abs().nlargest(3).index
+    pos  = [f for f in top3 if sv_series[f] > 0]
+    neg  = [f for f in top3 if sv_series[f] < 0]
+    if pos:
+        summary = (f"{fav_team} is favoured mainly because of "
+                   + " and ".join(_fragment(f) for f in pos[:2]))
+        if neg:
+            summary += f"; {_fragment(neg[0])} narrows the gap"
+    else:
+        summary = f"{fav_team} is narrowly favoured despite {_fragment(neg[0])}"
+    st.markdown(f"**{summary}.**")
+
     st.markdown(
-        f"Each bar is one factor the model considered. **Red bars pushed the "
-        f"prediction toward {outcome_labels[predicted_class]}** "
-        f"({proba[predicted_class]*100:.1f}%); **blue bars pushed against it**. "
-        f"Longer bar = stronger influence."
+        f"<span style='color:{fav_color}'>&#9632;</span> favours {fav_team} "
+        f"&nbsp;·&nbsp; "
+        f"<span style='color:{opp_color}'>&#9632;</span> favours {opp_team}",
+        unsafe_allow_html=True,
     )
 
-    # sv shape: (n_samples, n_features, n_classes)
-    sv = explainer.shap_values(X)
-    sv_for_class = sv[0, :, predicted_class]   # shape (n_features,)
+    # Top 8 factors + everything else aggregated into one bar
+    top8 = sv_series.abs().nlargest(8).index
+    rest_net = float(sv_series.drop(top8).sum())
+    shown = sv_series[top8].sort_values()  # ascending → biggest at top of chart
 
-    sv_series = pd.Series(sv_for_class, index=bundle["feature_cols"])
-    top_feats  = sv_series.abs().nlargest(15).index
-    sv_top     = sv_series[top_feats].sort_values()
-    nice_names = [FEATURE_LABELS.get(f, f) for f in sv_top.index]
+    y_labels = ["All other factors (net)"] + [_value_label(f) for f in shown.index]
+    x_vals   = [rest_net] + list(shown.values)
+    colors   = [fav_color if v > 0 else opp_color for v in x_vals]
 
     fig_shap = go.Figure(go.Bar(
-        x=sv_top.values,
-        y=nice_names,
+        x=x_vals,
+        y=y_labels,
         orientation="h",
-        marker_color=["#e74c3c" if v > 0 else "#2980b9" for v in sv_top.values],
+        marker_color=colors,
         hovertemplate="%{y}: %{x:.4f}<extra></extra>",
     ))
     fig_shap.update_layout(
-        xaxis_title="Influence on the prediction",
-        height=480,
-        margin=dict(l=10, r=20, t=45, b=40),
+        xaxis_title=f"← favours {opp_team}      favours {fav_team} →",
+        height=400,
+        margin=dict(l=10, r=20, t=20, b=40),
         yaxis=dict(automargin=True),
     )
     st.plotly_chart(fig_shap, use_container_width=True, config=_PLOTLY_CONFIG)
