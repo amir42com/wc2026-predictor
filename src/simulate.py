@@ -373,7 +373,9 @@ def simulate_tournament(
     predictor: Predictor,
     rng: np.random.Generator,
     verbose: bool = False,
+    rounds: dict[str, Counter] | None = None,
 ) -> str:
+    """If `rounds` is given, count each team's appearance per knockout stage."""
     # Group stage
     group_tables: dict[str, list[dict]] = {}
     for grp, teams in GROUPS.items():
@@ -385,28 +387,42 @@ def simulate_tournament(
                 print(f"    {rank+1}. {row['team']:<30s} {row['pts']}pts  GD{row['gd']:+d}{q}")
 
     r32 = resolve_r32(group_tables)
+    if rounds is not None:
+        for a, b in r32:
+            rounds["R32"][a] += 1
+            rounds["R32"][b] += 1
 
     if verbose:
         print(f"\n  Round of 32:")
     r32w = play_round(r32, predictor, rng, verbose=verbose)
+    if rounds is not None:
+        rounds["R16"].update(r32w)
 
     r16 = [(r32w[i], r32w[j]) for i, j in R16_PAIRS]
     if verbose:
         print(f"\n  Round of 16:")
     r16w = play_round(r16, predictor, rng, verbose=verbose)
+    if rounds is not None:
+        rounds["QF"].update(r16w)
 
     qf = [(r16w[i], r16w[j]) for i, j in QF_PAIRS]
     if verbose:
         print(f"\n  Quarter-finals:")
     qfw = play_round(qf, predictor, rng, verbose=verbose)
+    if rounds is not None:
+        rounds["SF"].update(qfw)
 
     sf = [(qfw[i], qfw[j]) for i, j in SF_PAIRS]
     if verbose:
         print(f"\n  Semi-finals:")
     sfw = play_round(sf, predictor, rng, verbose=verbose)
+    if rounds is not None:
+        rounds["Final"].update(sfw)
 
     finalist_a, finalist_b = sfw[0], sfw[1]
     champion = knockout_match(finalist_a, finalist_b, predictor, rng)
+    if rounds is not None:
+        rounds["Champion"][champion] += 1
     if verbose:
         print(f"\n  FINAL:  {finalist_a}  vs  {finalist_b}  ->  {champion}")
 
@@ -415,14 +431,28 @@ def simulate_tournament(
 
 # ── Monte Carlo ────────────────────────────────────────────────────────────
 
-def monte_carlo(n: int, predictor: Predictor, seed: int = 42) -> Counter:
+ROUND_NAMES = ["R32", "R16", "QF", "SF", "Final", "Champion"]
+
+
+def monte_carlo(n: int, predictor: Predictor, seed: int = 42,
+                track_rounds: bool = False):
+    """
+    Returns Counter of champions; with track_rounds=True returns
+    (champions, rounds) where rounds maps stage name -> Counter of teams
+    that reached it.
+    """
     rng  = np.random.default_rng(seed)
     wins: Counter = Counter()
+    rounds: dict[str, Counter] | None = (
+        {r: Counter() for r in ROUND_NAMES} if track_rounds else None
+    )
     step = max(1, n // 10)
     for i in range(n):
-        wins[simulate_tournament(predictor, rng)] += 1
+        wins[simulate_tournament(predictor, rng, rounds=rounds)] += 1
         if (i + 1) % step == 0:
             print(f"  {i+1:>6,} / {n:,} simulations done ...", flush=True)
+    if track_rounds:
+        return wins, rounds
     return wins
 
 
