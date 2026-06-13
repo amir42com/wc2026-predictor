@@ -427,6 +427,30 @@ h1, h2, h3 {
     overflow: visible;
 }
 
+/* Task 2 — mobile: one centered, horizontally-scrollable row of tabs.
+   `safe center` centers when they fit, falls back to scrollable start when
+   they overflow (so the first tab is never cut off). */
+@media (max-width: 768px) {
+    [data-testid="stMain"] [data-testid="stRadio"] [role="radiogroup"] {
+        flex-wrap: nowrap;
+        justify-content: safe center;
+        overflow-x: auto;
+        overflow-y: visible;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        gap: 0.5rem;
+        padding: 2px 2px 4px;
+    }
+    [data-testid="stMain"] [data-testid="stRadio"] [role="radiogroup"]::-webkit-scrollbar {
+        display: none;
+    }
+    [data-testid="stMain"] [data-testid="stRadio"] label {
+        flex: 0 0 auto;            /* keep full size; don't squash */
+        white-space: nowrap;
+        padding: 0.5rem 1rem;      /* comfortable touch target */
+    }
+}
+
 /* ── tables ── */
 [data-testid="stTable"] {
     border: 1px solid #26305a;
