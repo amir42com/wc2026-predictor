@@ -3,6 +3,7 @@ WC 2026 Prediction Dashboard
 Run: streamlit run app/streamlit_app.py
 """
 
+import base64
 import json
 import sys
 from collections import Counter
@@ -201,11 +202,50 @@ def _bootstrap_if_needed() -> None:
     st.rerun()
 
 
+# ── radar-sweep brand mark (inline SVG; theme accent #4fc3f7) ───────────────
+# Header mark — concentric rings, crosshair, translucent sweep wedge, one blip.
+RADAR_SVG = """
+<svg width="58" height="58" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="radarSweep" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#4fc3f7" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#4fc3f7" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <circle cx="32" cy="32" r="28" stroke="#4fc3f7" stroke-opacity="0.38" stroke-width="1.5"/>
+  <circle cx="32" cy="32" r="19" stroke="#4fc3f7" stroke-opacity="0.26" stroke-width="1.2"/>
+  <circle cx="32" cy="32" r="10" stroke="#4fc3f7" stroke-opacity="0.22" stroke-width="1.2"/>
+  <line x1="32" y1="4" x2="32" y2="60" stroke="#4fc3f7" stroke-opacity="0.18" stroke-width="1"/>
+  <line x1="4" y1="32" x2="60" y2="32" stroke="#4fc3f7" stroke-opacity="0.18" stroke-width="1"/>
+  <path d="M32 32 L32 4 A28 28 0 0 1 56 18 Z" fill="url(#radarSweep)"/>
+  <line x1="32" y1="32" x2="56" y2="18" stroke="#4fc3f7" stroke-opacity="0.75" stroke-width="1.5"/>
+  <circle cx="45" cy="19" r="5" fill="#4fc3f7" fill-opacity="0.22"/>
+  <circle cx="45" cy="19" r="2.4" fill="#4fc3f7"/>
+  <circle cx="32" cy="32" r="1.8" fill="#4fc3f7"/>
+</svg>
+"""
+
+# Compact favicon variant — bolder strokes + filled navy disc so it reads at 16px.
+RADAR_FAVICON = (
+    '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">'
+    '<circle cx="16" cy="16" r="15" fill="#0c1124"/>'
+    '<circle cx="16" cy="16" r="13" fill="none" stroke="#4fc3f7" stroke-opacity="0.85" stroke-width="2"/>'
+    '<circle cx="16" cy="16" r="7" fill="none" stroke="#4fc3f7" stroke-opacity="0.45" stroke-width="1.5"/>'
+    '<line x1="16" y1="3" x2="16" y2="29" stroke="#4fc3f7" stroke-opacity="0.3" stroke-width="1"/>'
+    '<line x1="3" y1="16" x2="29" y2="16" stroke="#4fc3f7" stroke-opacity="0.3" stroke-width="1"/>'
+    '<path d="M16 16 L16 3 A13 13 0 0 1 27 9 Z" fill="#4fc3f7" fill-opacity="0.5"/>'
+    '<circle cx="23" cy="10" r="2.2" fill="#4fc3f7"/>'
+    '</svg>'
+)
+_FAVICON_DATA_URI = ("data:image/svg+xml;base64,"
+                     + base64.b64encode(RADAR_FAVICON.encode()).decode())
+
+
 # ── page config ────────────────────────────────────────────────────────────
 
 st.set_page_config(
     page_title="WC 2026 Predictor · Amir Mohammadi",
-    page_icon="⚽",
+    page_icon=_FAVICON_DATA_URI,
     layout="wide",
     initial_sidebar_state="expanded",
     menu_items={
@@ -580,7 +620,7 @@ st.sidebar.markdown(f"""
 
 page = st.radio(
     "Navigate",
-    ["Match Predictor", "Tournament Simulator", "Team Rankings", "📊 Prediction Tracker"],
+    ["Match Predictor", "Tournament Simulator", "Team Rankings", "📡 Prediction Tracker"],
     horizontal=True,
     label_visibility="collapsed",
 )
@@ -1125,7 +1165,7 @@ elif page == "Team Rankings":
 # ══════════════════════════════════════════════════════════════════════════
 
 else:
-    hero("📊", "PREDICTION TRACKER",
+    hero(RADAR_SVG, "PREDICTION TRACKER",
          "Model vs Reality &nbsp;·&nbsp; Live WC 2026 Results",
          "How the model's pre-tournament predictions are holding up")
 
