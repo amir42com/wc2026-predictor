@@ -78,6 +78,20 @@ def flag_img(team: str) -> str:
             f'alt="" loading="lazy" style="vertical-align:baseline">')
 
 
+# Compact display names so narrow table columns don't wrap
+SHORT_NAMES: dict[str, str] = {
+    "Czech Republic":         "Czechia",
+    "Bosnia and Herzegovina": "Bosnia & Herz.",
+    "United States":          "USA",
+    "South Korea":            "S. Korea",
+    "South Africa":           "S. Africa",
+}
+
+
+def short_name(team: str) -> str:
+    return SHORT_NAMES.get(team, team)
+
+
 # Human-readable names for every model feature (used in the SHAP chart)
 CONF_FULL = {
     "UEFA": "Europe", "CONMEBOL": "South America",
@@ -297,6 +311,44 @@ h1, h2, h3 {
 .html-table td { padding: 0.45rem 0.75rem; border-bottom: 1px solid #1d2547; }
 .html-table tbody tr:hover td { background: rgba(79,195,247,0.05); }
 
+/* fixed equal columns so the 12 group tables align */
+.group-table table { table-layout: fixed; }
+.group-table th:nth-child(1) { width: 48%; }
+.group-table th:nth-child(2) { width: 26%; }
+.group-table th:nth-child(3) { width: 26%; }
+.group-table th, .group-table td {
+    white-space: nowrap;
+    font-size: 0.85rem;
+    padding: 0.4rem 0.5rem;
+    overflow: hidden;
+}
+
+/* group blocks in the Elo snapshot table */
+.html-table tr.grp-even td { background: rgba(79, 195, 247, 0.045); }
+.html-table tr.grp-start td { border-top: 2px solid #2a3560; }
+
+/* ── top navigation pills ── */
+[data-testid="stMain"] [data-testid="stRadio"] [role="radiogroup"] {
+    display: flex; gap: 0.5rem; flex-wrap: wrap;
+}
+[data-testid="stMain"] [data-testid="stRadio"] label {
+    background: #151d3b;
+    border: 1px solid #26305a;
+    border-radius: 999px;
+    padding: 0.4rem 1.1rem;
+    cursor: pointer;
+    transition: border-color .15s ease, background .15s ease;
+}
+[data-testid="stMain"] [data-testid="stRadio"] label:hover { border-color: #4fc3f7; }
+[data-testid="stMain"] [data-testid="stRadio"] label > div:first-of-type { display: none; }
+[data-testid="stMain"] [data-testid="stRadio"] label:has(input:checked) {
+    background: linear-gradient(90deg, #2196f3, #4fc3f7);
+    border-color: transparent;
+}
+[data-testid="stMain"] [data-testid="stRadio"] label:has(input:checked) p {
+    color: #fff; font-weight: 600;
+}
+
 /* ── tables ── */
 [data-testid="stTable"] {
     border: 1px solid #26305a;
@@ -363,7 +415,6 @@ h1, h2, h3 {
     background: #0a0e27;
     border-right: 1px solid #1d2547;
 }
-[data-testid="stSidebar"] [data-testid="stRadio"] label p { font-size: 1rem; }
 [data-testid="stSidebar"] [data-testid="stCaptionContainer"] p { font-size: 0.85rem; }
 
 /* main-page captions: keep body text readable (never below 0.9rem) */
@@ -464,10 +515,6 @@ _PLOTLY_CONFIG = {"staticPlot": True}
 # ── sidebar navigation ─────────────────────────────────────────────────────
 
 st.sidebar.title("⚽ WC 2026 Predictor")
-page = st.sidebar.radio(
-    "Navigate",
-    ["Match Predictor", "Tournament Simulator", "Team Rankings"],
-)
 
 st.sidebar.markdown("---")
 with st.sidebar.expander("ℹ️ About the model"):
@@ -519,9 +566,19 @@ st.sidebar.markdown(f"""
     <a href="https://www.linkedin.com/in/amir42com/" target="_blank">{_ICON_LINKEDIN} LinkedIn</a> ·
     <a href="https://github.com/amir42com/wc2026-predictor" target="_blank">{_ICON_GITHUB} GitHub</a>
   </p>
-  <p class="credits-version">v1.4 · June 2026</p>
+  <p class="credits-version">v1.5 · June 2026</p>
 </div>
 """, unsafe_allow_html=True)
+
+
+# ── top navigation pills (always visible — sidebar collapses on mobile) ────
+
+page = st.radio(
+    "Navigate",
+    ["Match Predictor", "Tournament Simulator", "Team Rankings"],
+    horizontal=True,
+    label_visibility="collapsed",
+)
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -813,9 +870,10 @@ elif page == "Tournament Simulator":
 
     if run_btn:
         with st.spinner(f"Simulating {n_sims:,} tournaments …"):
-            wins = monte_carlo(n_sims, predictor, seed=seed)
-        st.session_state["sim_wins"] = dict(wins)
-        st.session_state["sim_n"]    = n_sims
+            wins, rounds = monte_carlo(n_sims, predictor, seed=seed, track_rounds=True)
+        st.session_state["sim_wins"]   = dict(wins)
+        st.session_state["sim_n"]      = n_sims
+        st.session_state["sim_rounds"] = {k: dict(v) for k, v in rounds.items()}
 
     if "sim_wins" not in st.session_state:
         st.info("Set parameters above and click **Run simulations**.")
@@ -872,6 +930,40 @@ elif page == "Tournament Simulator":
     )
     st.markdown(legend_md, unsafe_allow_html=True)
 
+    # ── knockout advancement table ─────────────────────────────────────────
+    sim_rounds = st.session_state.get("sim_rounds")
+    if sim_rounds:
+        st.markdown("---")
+        st.subheader("How far does each team go?")
+        st.caption(
+            "Share of simulations in which each team reached every stage — "
+            "from escaping the group (R32) to lifting the trophy. "
+            "Darker cell = happens more often."
+        )
+
+        STAGES = ["R32", "R16", "QF", "SF", "Final", "Champion"]
+        adv = pd.DataFrame([
+            {"team": t, **{s: sim_rounds.get(s, {}).get(t, 0) / total for s in STAGES}}
+            for t in WC_TEAMS
+        ]).sort_values(["Champion", "Final", "SF"], ascending=False)
+
+        head = "<tr><th>Team</th>" + "".join(f"<th>{s} %</th>" for s in STAGES) + "</tr>"
+        body = []
+        for _, r in adv.iterrows():
+            cells = [f'<td>{flag_img(r["team"])} {short_name(r["team"])}</td>']
+            for s in STAGES:
+                v = float(r[s])
+                cells.append(
+                    f'<td style="background:rgba(33,150,243,{v*0.65:.3f})">'
+                    f'{v*100:.0f}%</td>'
+                )
+            body.append("<tr>" + "".join(cells) + "</tr>")
+        st.markdown(
+            f'<div class="html-table"><table><thead>{head}</thead>'
+            f'<tbody>{"".join(body)}</tbody></table></div>',
+            unsafe_allow_html=True,
+        )
+
     # ── group-stage qualification rates ───────────────────────────────────
     st.markdown("---")
     st.subheader("Group-stage qualification rates")
@@ -904,24 +996,23 @@ elif page == "Tournament Simulator":
             "at WC 2026 the 8 best third-placed teams also advance."
         )
 
-        gs_rows = []
-        for grp, teams in sorted(GROUPS.items()):
-            for t in teams:
-                gs_rows.append({
-                    "Group": grp,
-                    "Team":  t,
-                    "Top-2 qual %": f"{qc.get(t, 0) / n * 100:.0f}%",
-                    "3rd place %":  f"{tc.get(t, 0) / n * 100:.0f}%",
-                    "Eliminated %": f"{(n - qc.get(t,0) - tc.get(t,0)) / n * 100:.0f}%",
-                })
-        gs_df = pd.DataFrame(gs_rows)
-
         cols = st.columns(3)
         for idx, grp in enumerate(sorted(GROUPS.keys())):
             with cols[idx % 3]:
                 st.markdown(f"**Group {grp}**")
-                sub = gs_df[gs_df["Group"] == grp][["Team","Top-2 qual %","3rd place %"]].set_index("Team")
-                st.table(sub)
+                ranked = sorted(GROUPS[grp], key=lambda t: -qc.get(t, 0))
+                body = "".join(
+                    f"<tr><td>{flag_img(t)} {short_name(t)}</td>"
+                    f"<td>{qc.get(t, 0) / n * 100:.0f}%</td>"
+                    f"<td>{tc.get(t, 0) / n * 100:.0f}%</td></tr>"
+                    for t in ranked
+                )
+                st.markdown(
+                    '<div class="html-table group-table"><table>'
+                    "<thead><tr><th>Team</th><th>Top-2 %</th><th>3rd %</th></tr></thead>"
+                    f"<tbody>{body}</tbody></table></div>",
+                    unsafe_allow_html=True,
+                )
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -1006,7 +1097,19 @@ else:
     wc_df = wc_df.sort_values("Group")
     wc_df["Elo"] = wc_df["Elo"].map("{:.1f}".format)
 
+    # Manual rows: alternate shading per group + border at each group boundary
+    table_cols = ["Group", "Flag", "Team", "Elo", "Confederation"]
+    head = "<tr>" + "".join(f"<th>{c}</th>" for c in table_cols) + "</tr>"
+    body, prev_grp = [], None
+    for _, r in wc_df.iterrows():
+        cls = "grp-even" if (ord(r["Group"]) - ord("A")) % 2 == 0 else ""
+        if prev_grp is not None and r["Group"] != prev_grp:
+            cls = (cls + " grp-start").strip()
+        prev_grp = r["Group"]
+        cells = "".join(f"<td>{r[c]}</td>" for c in table_cols)
+        body.append(f'<tr class="{cls}">{cells}</tr>')
     st.markdown(
-        f'<div class="html-table">{wc_df.to_html(escape=False, index=False)}</div>',
+        f'<div class="html-table"><table><thead>{head}</thead>'
+        f'<tbody>{"".join(body)}</tbody></table></div>',
         unsafe_allow_html=True,
     )
