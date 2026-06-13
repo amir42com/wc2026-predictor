@@ -3,8 +3,10 @@ WC 2026 Prediction Dashboard
 Run: streamlit run app/streamlit_app.py
 """
 
+import json
 import sys
 from collections import Counter
+from datetime import datetime, timezone
 from pathlib import Path
 
 import joblib
@@ -17,6 +19,9 @@ import streamlit as st
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from simulate import GROUPS, Predictor, monte_carlo, simulate_group, resolve_r32
 from train import ELO_BLEND_W, elo_prior_proba, make_X
+import fetch_results
+
+RESULTS_PATH = Path(__file__).resolve().parents[1] / "data" / "wc2026_results.json"
 
 PROCESSED_DIR = Path(__file__).resolve().parents[1] / "data" / "processed"
 MODELS_DIR    = Path(__file__).resolve().parents[1] / "models"
@@ -575,7 +580,7 @@ st.sidebar.markdown(f"""
 
 page = st.radio(
     "Navigate",
-    ["Match Predictor", "Tournament Simulator", "Team Rankings"],
+    ["Match Predictor", "Tournament Simulator", "Team Rankings", "📊 Prediction Tracker"],
     horizontal=True,
     label_visibility="collapsed",
 )
@@ -1019,7 +1024,7 @@ elif page == "Tournament Simulator":
 #  PAGE 3 — TEAM RANKINGS
 # ══════════════════════════════════════════════════════════════════════════
 
-else:
+elif page == "Team Rankings":
     hero("📊", "TEAM RANKINGS",
          "Elo Ratings &nbsp;·&nbsp; 49,000+ Matches &nbsp;·&nbsp; 1872–2026",
          "336 national teams ranked by predictive strength")
@@ -1112,4 +1117,175 @@ else:
         f'<div class="html-table"><table><thead>{head}</thead>'
         f'<tbody>{"".join(body)}</tbody></table></div>',
         unsafe_allow_html=True,
+    )
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  PAGE 4 — PREDICTION TRACKER
+# ══════════════════════════════════════════════════════════════════════════
+
+else:
+    hero("📊", "PREDICTION TRACKER",
+         "Model vs Reality &nbsp;·&nbsp; Live WC 2026 Results",
+         "How the model's pre-tournament predictions are holding up")
+
+    @st.cache_data(ttl=3600, show_spinner=False)
+    def load_tracked_results() -> tuple[dict | None, str | None]:
+        """
+        Fetch live results (hourly cache); on any failure fall back to the
+        last saved JSON. Returns (payload, warning_or_error).
+        """
+        try:
+            return fetch_results.fetch_and_save(), None
+        except Exception as exc:  # API key missing, network down, rate-limited…
+            if RESULTS_PATH.exists():
+                payload = json.loads(RESULTS_PATH.read_text(encoding="utf-8"))
+                return payload, f"Couldn't reach the live API ({exc}); showing last saved results."
+            return None, (
+                "Live results are unavailable and no saved results were found. "
+                "This usually means the football-data.org API key isn't configured."
+            )
+
+    def _ago(iso: str) -> str:
+        try:
+            then = datetime.fromisoformat(iso.replace("Z", "+00:00"))
+            mins = (datetime.now(timezone.utc) - then).total_seconds() / 60
+            if mins < 1:
+                return "just now"
+            if mins < 60:
+                return f"{int(mins)} minute{'s' if int(mins) != 1 else ''} ago"
+            hours = mins / 60
+            if hours < 24:
+                return f"{int(hours)} hour{'s' if int(hours) != 1 else ''} ago"
+            return f"{int(hours / 24)} day{'s' if int(hours / 24) != 1 else ''} ago"
+        except Exception:
+            return "unknown"
+
+    top_l, top_r = st.columns([4, 1])
+    with top_l:
+        st.markdown(
+            "Every match below was predicted **before the tournament began** — "
+            "the model has never seen a single WC 2026 result. Here's how its "
+            "calls compare to what actually happened."
+        )
+    with top_r:
+        if st.button("🔄 Refresh results"):
+            load_tracked_results.clear()
+            st.rerun()
+
+    payload, warning = load_tracked_results()
+
+    if payload is None:
+        st.error(warning)
+        st.stop()
+    if warning:
+        st.warning(warning)
+
+    matches = payload.get("matches", [])
+    scored  = [m for m in matches if m.get("correct") is not None]
+
+    st.caption(f"Last updated: {_ago(payload.get('fetched_at', ''))} · "
+               f"Match data: [football-data.org](https://www.football-data.org)")
+
+    if not scored:
+        st.info(
+            "No finished matches with predictions yet. Check back once WC 2026 "
+            "games have been played."
+        )
+        st.stop()
+
+    # ── headline stats ─────────────────────────────────────────────────────
+    n          = len(scored)
+    n_correct  = sum(m["correct"] for m in scored)
+    acc        = n_correct / n
+
+    # Model vs naive Elo-baseline log-loss (both leakage-free, pre-tournament)
+    eps = 1e-15
+    model_ll, base_ll = [], []
+    for m in scored:
+        a = m["actual_outcome"]
+        pm = np.clip([m["p_home"], m["p_draw"], m["p_away"]], eps, 1)
+        model_ll.append(-np.log(pm[a]))
+        eh = predictor._state.get(m["home_team"], predictor._default_state())["elo"]
+        ea = predictor._state.get(m["away_team"], predictor._default_state())["elo"]
+        pb = np.clip(elo_prior_proba(eh, ea), eps, 1)
+        base_ll.append(-np.log(pb[a]))
+    model_ll = float(np.mean(model_ll))
+    base_ll  = float(np.mean(base_ll))
+    ll_delta = base_ll - model_ll  # positive = model beats baseline
+
+    s1, s2, s3 = st.columns(3)
+    cards = [
+        (s1, "#3b82f6", "Matches tracked", f"{n}", f"{payload.get('n_matches', n)} finished"),
+        (s2, "#2ecc71", "Correct predictions", f"{acc*100:.0f}%", f"{n_correct} of {n}"),
+        (s3, "#f59e0b", "Model log-loss",
+         f"{model_ll:.3f}",
+         (f"{'beats' if ll_delta >= 0 else 'trails'} Elo baseline "
+          f"({base_ll:.3f})")),
+    ]
+    for col, color, label, value, sub in cards:
+        col.markdown(
+            f'<div class="prob-card" style="border-left:4px solid {color}">'
+            f'<div class="prob-label">{label}</div>'
+            f'<div class="prob-value">{value}</div>'
+            f'<div style="color:#5b6379;font-size:0.8rem;margin-top:0.25rem">{sub}</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+
+    st.caption(
+        "**Log-loss** rewards confident correct calls and punishes confident "
+        "wrong ones (lower is better). The **Elo baseline** is the simple "
+        "\"stronger team wins\" rule — beating it means the model adds real value."
+    )
+
+    # ── results table ──────────────────────────────────────────────────────
+    st.markdown("---")
+    st.subheader("Match-by-match")
+
+    OUTCOME_COLORS = ["#3b82f6", "#6b7280", "#f59e0b"]
+
+    def _prob_mini_bar(m: dict) -> str:
+        probs = [m["p_home"], m["p_draw"], m["p_away"]]
+        pred  = m["predicted_outcome"]
+        segs = "".join(
+            f'<div style="width:{p*100:.0f}%;background:{c};'
+            f'{"opacity:1" if i == pred else "opacity:0.4"}"></div>'
+            for i, (p, c) in enumerate(zip(probs, OUTCOME_COLORS))
+        )
+        return (f'<div style="display:flex;height:14px;border-radius:4px;'
+                f'overflow:hidden;min-width:90px">{segs}</div>')
+
+    rows = []
+    for m in matches:
+        if m.get("correct") is None:
+            continue
+        h, a = m["home_team"], m["away_team"]
+        result_col = ("#2ecc71" if m["correct"] else "#e74c3c")
+        mark = "✅" if m["correct"] else "❌"
+        pp = (f'{m["p_home"]*100:.0f}% / {m["p_draw"]*100:.0f}% / '
+              f'{m["p_away"]*100:.0f}%')
+        rows.append(
+            f'<tr>'
+            f'<td>{m["date"]}</td>'
+            f'<td>{flag_img(h)} {short_name(h)} '
+            f'<b>{m["home_score"]}–{m["away_score"]}</b> '
+            f'{short_name(a)} {flag_img(a)}</td>'
+            f'<td>{_prob_mini_bar(m)}</td>'
+            f'<td style="font-size:0.82rem;color:#93a1c8">{pp}</td>'
+            f'<td style="color:{result_col};font-weight:600">{mark}</td>'
+            f'</tr>'
+        )
+
+    st.markdown(
+        '<div class="html-table"><table><thead><tr>'
+        '<th>Date</th><th>Result</th><th>Prediction</th>'
+        '<th>Win / Draw / Loss</th><th>Call</th>'
+        '</tr></thead><tbody>' + "".join(rows) + '</tbody></table></div>',
+        unsafe_allow_html=True,
+    )
+    st.caption(
+        "Prediction bar shows the model's win / draw / loss probabilities "
+        "(home blue · draw gray · away amber); the solid segment was the "
+        "model's pick. ✅ = correct, ❌ = wrong."
     )
