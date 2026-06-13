@@ -39,6 +39,20 @@ CONF_COLOR = {
     "Other":    "#95a5a6",
 }
 
+
+def conf_legend_html(extra: str = "") -> str:
+    """Confederation legend as a flex-wrap row so items never clip on mobile."""
+    items = "".join(
+        '<span style="display:inline-flex;align-items:center;gap:5px;white-space:nowrap">'
+        f'<span style="width:11px;height:11px;border-radius:2px;background:{c};'
+        f'display:inline-block;flex:0 0 auto"></span>{conf}</span>'
+        for conf, c in CONF_COLOR.items() if conf != "Other"
+    )
+    tail = (f'<span style="color:#93a1c8;white-space:nowrap">{extra}</span>'
+            if extra else "")
+    return (f'<div style="display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;'
+            f'font-size:0.85rem;color:#cdd6ee;margin-top:4px">{items}{tail}</div>')
+
 # ISO 3166-1 alpha-2 codes for flagcdn.com — flag images render everywhere,
 # unlike emoji (which fall back to letter pairs on Windows)
 ISO2: dict[str, str] = {
@@ -1001,29 +1015,29 @@ elif page == "Tournament Simulator":
 
     fig_wins = go.Figure(go.Bar(
         x=dw["pct"],
-        y=dw["team"],
+        y=dw["team"].map(short_name),
         orientation="h",
         marker_color=dw["color"].tolist(),
         text=dw["pct"].map("{:.1f}%".format),
         textposition="outside",
+        textfont=dict(size=12),
         cliponaxis=False,
         hovertemplate="%{y}<br>%{x:.2f}%<extra></extra>",
     ))
     fig_wins.update_layout(
         xaxis_title="Win probability (%)",
-        height=max(420, len(dw) * 34),
-        margin=dict(t=20, b=30, l=175, r=55),
-        xaxis=dict(range=[0, dw["pct"].max() * 1.35], automargin=True),
-        yaxis=dict(automargin=True),
+        # min ~26px/bar so bars stay readable; short y-labels + automargin keep
+        # the left margin tight so bars get maximum width on mobile (Task 6)
+        height=max(360, len(dw) * 30),
+        margin=dict(t=12, b=28, l=8, r=44),
+        bargap=0.22,
+        xaxis=dict(range=[0, dw["pct"].max() * 1.32], automargin=True,
+                   tickfont=dict(size=11)),
+        yaxis=dict(automargin=True, tickfont=dict(size=12)),
     )
     st.plotly_chart(fig_wins, use_container_width=True, config=_PLOTLY_CONFIG)
 
-    # confederation legend
-    legend_md = "  ".join(
-        f"<span style='color:{c}'>&#9632;</span> {conf}"
-        for conf, c in CONF_COLOR.items() if conf != "Other"
-    )
-    st.markdown(legend_md, unsafe_allow_html=True)
+    st.markdown(conf_legend_html(), unsafe_allow_html=True)
 
     # ── knockout advancement table ─────────────────────────────────────────
     sim_rounds = st.session_state.get("sim_rounds")
@@ -1146,30 +1160,30 @@ elif page == "Team Rankings":
 
     fig_elo = go.Figure(go.Bar(
         x=td["elo"],
-        y=td["team"],
+        y=td["team"].map(short_name),
         orientation="h",
         marker_color=td["color"].tolist(),
         marker_line_width=td["wc2026"].map(lambda b: 2.5 if b else 0).tolist(),
         marker_line_color="white",
         text=td["elo"].map("{:.0f}".format),
         textposition="outside",
+        textfont=dict(size=12),
         cliponaxis=False,
         hovertemplate="%{y}<br>Elo: %{x:.1f}<extra></extra>",
     ))
     fig_elo.update_layout(
         xaxis_title="Elo rating",
-        height=max(420, len(td) * 28),
-        margin=dict(t=20, b=30, l=175, r=55),
-        xaxis=dict(range=[td["elo"].min() * 0.97, td["elo"].max() * 1.1], automargin=True),
-        yaxis=dict(automargin=True),
+        height=max(360, len(td) * 28),
+        margin=dict(t=12, b=28, l=8, r=44),
+        bargap=0.2,
+        xaxis=dict(range=[td["elo"].min() * 0.97, td["elo"].max() * 1.1],
+                   automargin=True, tickfont=dict(size=11)),
+        yaxis=dict(automargin=True, tickfont=dict(size=12)),
     )
     st.plotly_chart(fig_elo, use_container_width=True, config=_PLOTLY_CONFIG)
 
-    legend_md = "  ".join(
-        f"<span style='color:{c}'>&#9632;</span> {conf}"
-        for conf, c in CONF_COLOR.items() if conf != "Other"
-    ) + "  &nbsp; (white border = WC 2026 participant)"
-    st.markdown(legend_md, unsafe_allow_html=True)
+    st.markdown(conf_legend_html("· white border = WC 2026 participant"),
+                unsafe_allow_html=True)
 
     # ── WC 2026 teams table ────────────────────────────────────────────────
     st.markdown("---")
