@@ -34,42 +34,76 @@ CONF_COLOR = {
     "Other":    "#95a5a6",
 }
 
-FLAGS: dict[str, str] = {
+# ISO 3166-1 alpha-2 codes for flagcdn.com — flag images render everywhere,
+# unlike emoji (which fall back to letter pairs on Windows)
+ISO2: dict[str, str] = {
     # CONMEBOL
-    "Argentina":   "🇦🇷", "Brazil":     "🇧🇷", "Colombia":   "🇨🇴",
-    "Ecuador":     "🇪🇨", "Uruguay":    "🇺🇾", "Paraguay":   "🇵🇾",
-    "Chile":       "🇨🇱", "Venezuela":  "🇻🇪", "Peru":       "🇵🇪",
-    "Bolivia":     "🇧🇴",
+    "Argentina": "ar", "Brazil": "br", "Colombia": "co", "Ecuador": "ec",
+    "Uruguay": "uy", "Paraguay": "py", "Chile": "cl", "Venezuela": "ve",
+    "Peru": "pe", "Bolivia": "bo",
     # UEFA
-    "France":      "🇫🇷", "Spain":      "🇪🇸", "Germany":    "🇩🇪",
-    "Portugal":    "🇵🇹", "England":    "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "Netherlands": "🇳🇱",
-    "Belgium":     "🇧🇪", "Italy":      "🇮🇹", "Croatia":    "🇭🇷",
-    "Switzerland": "🇨🇭", "Denmark":    "🇩🇰", "Sweden":     "🇸🇪",
-    "Norway":      "🇳🇴", "Austria":    "🇦🇹", "Poland":     "🇵🇱",
-    "Serbia":      "🇷🇸", "Scotland":   "🏴󠁧󠁢󠁳󠁣󠁴󠁿", "Turkey":     "🇹🇷",
-    "Czech Republic": "🇨🇿", "Slovakia": "🇸🇰", "Hungary":   "🇭🇺",
-    "Romania":     "🇷🇴", "Ukraine":    "🇺🇦", "Greece":     "🇬🇷",
-    "Bosnia and Herzegovina": "🇧🇦", "Albania": "🇦🇱", "Georgia": "🇬🇪",
-    "Slovenia":    "🇸🇮",
+    "France": "fr", "Spain": "es", "Germany": "de", "Portugal": "pt",
+    "England": "gb-eng", "Netherlands": "nl", "Belgium": "be", "Italy": "it",
+    "Croatia": "hr", "Switzerland": "ch", "Denmark": "dk", "Sweden": "se",
+    "Norway": "no", "Austria": "at", "Poland": "pl", "Serbia": "rs",
+    "Scotland": "gb-sct", "Turkey": "tr", "Czech Republic": "cz",
+    "Slovakia": "sk", "Hungary": "hu", "Romania": "ro", "Ukraine": "ua",
+    "Greece": "gr", "Bosnia and Herzegovina": "ba", "Albania": "al",
+    "Georgia": "ge", "Slovenia": "si",
     # CONCACAF
-    "United States": "🇺🇸", "Mexico":   "🇲🇽", "Canada":    "🇨🇦",
-    "Panama":      "🇵🇦", "Costa Rica": "🇨🇷", "Jamaica":   "🇯🇲",
-    "Haiti":       "🇭🇹", "Honduras":  "🇭🇳", "Guatemala":  "🇬🇹",
-    "El Salvador": "🇸🇻", "Trinidad and Tobago": "🇹🇹",
-    "Curaçao":     "🇨🇼",
+    "United States": "us", "Mexico": "mx", "Canada": "ca", "Panama": "pa",
+    "Costa Rica": "cr", "Jamaica": "jm", "Haiti": "ht", "Honduras": "hn",
+    "Guatemala": "gt", "El Salvador": "sv", "Trinidad and Tobago": "tt",
+    "Curaçao": "cw",
     # CAF
-    "Morocco":     "🇲🇦", "Senegal":   "🇸🇳", "Egypt":      "🇪🇬",
-    "Nigeria":     "🇳🇬", "Ghana":     "🇬🇭", "Ivory Coast": "🇨🇮",
-    "Cameroon":    "🇨🇲", "Mali":      "🇲🇱", "Algeria":    "🇩🇿",
-    "Tunisia":     "🇹🇳", "South Africa": "🇿🇦", "DR Congo":  "🇨🇩",
-    "Cape Verde":  "🇨🇻",
+    "Morocco": "ma", "Senegal": "sn", "Egypt": "eg", "Nigeria": "ng",
+    "Ghana": "gh", "Ivory Coast": "ci", "Cameroon": "cm", "Mali": "ml",
+    "Algeria": "dz", "Tunisia": "tn", "South Africa": "za", "DR Congo": "cd",
+    "Cape Verde": "cv",
     # AFC
-    "Japan":       "🇯🇵", "South Korea": "🇰🇷", "Australia": "🇦🇺",
-    "Iran":        "🇮🇷", "Saudi Arabia": "🇸🇦", "Qatar":    "🇶🇦",
-    "Iraq":        "🇮🇶", "Jordan":    "🇯🇴", "Uzbekistan": "🇺🇿",
-    "China":       "🇨🇳", "India":     "🇮🇳", "UAE":        "🇦🇪",
+    "Japan": "jp", "South Korea": "kr", "Australia": "au", "Iran": "ir",
+    "Saudi Arabia": "sa", "Qatar": "qa", "Iraq": "iq", "Jordan": "jo",
+    "Uzbekistan": "uz", "China": "cn", "India": "in", "UAE": "ae",
     # OFC
-    "New Zealand": "🇳🇿",
+    "New Zealand": "nz",
+}
+
+
+def flag_img(team: str) -> str:
+    """16x12 flag <img> for HTML-rendered contexts; empty string if unknown."""
+    iso = ISO2.get(team)
+    if not iso:
+        return ""
+    return (f'<img src="https://flagcdn.com/16x12/{iso}.png" width="16" height="12" '
+            f'alt="" loading="lazy" style="vertical-align:baseline">')
+
+
+# Human-readable names for every model feature (used in the SHAP chart)
+CONF_FULL = {
+    "UEFA": "Europe", "CONMEBOL": "South America",
+    "CONCACAF": "North/Central America", "CAF": "Africa",
+    "AFC": "Asia", "OFC": "Oceania", "Other": "other region",
+}
+FEATURE_LABELS: dict[str, str] = {
+    "home_elo":          "Home team strength (Elo)",
+    "away_elo":          "Away team strength (Elo)",
+    "elo_diff":          "Team strength gap (Elo)",
+    "home_win_rate_5":   "Home: win rate, last 5 games",
+    "away_win_rate_5":   "Away: win rate, last 5 games",
+    "home_gd_5":         "Home: goal difference, last 5 games",
+    "away_gd_5":         "Away: goal difference, last 5 games",
+    "home_win_rate_10":  "Home: win rate, last 10 games",
+    "away_win_rate_10":  "Away: win rate, last 10 games",
+    "home_gd_10":        "Home: goal difference, last 10 games",
+    "away_gd_10":        "Away: goal difference, last 10 games",
+    "h2h_n":             "Head-to-head: games played",
+    "h2h_home_wr":       "Head-to-head: home win rate",
+    "home_conf_elo":     "Home confederation strength",
+    "away_conf_elo":     "Away confederation strength",
+    "neutral":           "Neutral venue",
+    "is_world_cup":      "World Cup match",
+    **{f"h_conf_{c}": f"Home team from {c} ({full})" for c, full in CONF_FULL.items()},
+    **{f"a_conf_{c}": f"Away team from {c} ({full})" for c, full in CONF_FULL.items()},
 }
 
 # ── cached resources ───────────────────────────────────────────────────────
@@ -213,11 +247,55 @@ h1, h2, h3 {
 }
 [data-testid="stMetricLabel"] { color: #93a1c8; }
 
-/* identity-color accents linking metric cards to the probability bar:
-   col 1 = home (blue), col 2 = draw (gray), col 3 = away (amber) */
-[data-testid="stColumn"]:nth-of-type(1) [data-testid="stMetric"] { border-left: 4px solid #3b82f6; }
-[data-testid="stColumn"]:nth-of-type(2) [data-testid="stMetric"] { border-left: 4px solid #6b7280; }
-[data-testid="stColumn"]:nth-of-type(3) [data-testid="stMetric"] { border-left: 4px solid #f59e0b; }
+/* ── probability cards (HTML so flag images render) ── */
+.prob-card {
+    background: linear-gradient(160deg, #151d3b 0%, #10162e 100%);
+    border: 1px solid #26305a;
+    border-radius: 14px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 0.5rem;
+    transition: border-color .2s ease, transform .2s ease, box-shadow .2s ease;
+}
+.prob-card:hover {
+    border-color: rgba(79, 195, 247, 0.55);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 24px rgba(79, 195, 247, 0.08);
+}
+.prob-card .prob-label { color: #93a1c8; font-size: 0.9rem; margin-bottom: 0.2rem; }
+.prob-card .prob-value {
+    font-family: 'Sora', sans-serif;
+    font-size: 2rem; font-weight: 700; color: #e8ecf6;
+}
+.prob-card img { vertical-align: -1px; margin-right: 5px; }
+
+/* ── HTML stacked probability bar ── */
+.prob-bar {
+    display: flex; height: 46px;
+    border-radius: 10px; overflow: hidden;
+    margin: 0.4rem 0 1rem 0;
+    font-size: 0.9rem; font-weight: 600; color: #fff;
+}
+.prob-bar .seg {
+    display: flex; align-items: center; justify-content: center;
+    gap: 6px; white-space: nowrap; overflow: hidden;
+}
+
+/* ── HTML tables (flag images need unescaped HTML) ── */
+.html-table table {
+    width: 100%; border-collapse: collapse;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                 Arial, sans-serif, "Noto Color Emoji";
+    font-size: 0.92rem;
+    border: 1px solid #26305a; border-radius: 12px;
+}
+.html-table th {
+    color: #93a1c8; font-weight: 600; text-align: left;
+    background: #10162e;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid #26305a;
+}
+.html-table td { padding: 0.45rem 0.75rem; border-bottom: 1px solid #1d2547; }
+.html-table tbody tr:hover td { background: rgba(79,195,247,0.05); }
 
 /* ── tables ── */
 [data-testid="stTable"] {
@@ -392,11 +470,17 @@ page = st.sidebar.radio(
 )
 
 st.sidebar.markdown("---")
-st.sidebar.caption(
-    "Model: XGBoost + Elo prior blend (0.75/0.25) · "
-    f"{len(bundle['feature_cols'])} features · "
-    "data up to 2026-06-10"
-)
+with st.sidebar.expander("ℹ️ About the model"):
+    st.markdown(
+        "Predictions come from a **machine-learning model** (XGBoost) that "
+        "learned from **49,000+ international matches played since 1872**.\n\n"
+        "For each fixture it weighs team strength, recent form, and "
+        "head-to-head history to estimate win / draw / loss chances.\n\n"
+        "Those chances are blended with **Elo ratings** — a chess-style "
+        "strength score updated after every match — which keeps the "
+        "probabilities realistic for tournament play.\n\n"
+        "[Technical details on GitHub](https://github.com/amir42com/wc2026-predictor)"
+    )
 
 # ── credits ──────────────────────────────────────────────────────────────
 _ICON_GLOBE = (
@@ -456,15 +540,13 @@ if page == "Match Predictor":
     c1, cmid, c2 = st.columns([5, 1, 5])
     with c1:
         home_default = team_pool.index("Argentina") if "Argentina" in team_pool else 0
-        home_team = st.selectbox("Home team", team_pool, index=home_default,
-                                  format_func=lambda t: f"{FLAGS.get(t, '')} {t}".strip())
+        home_team = st.selectbox("Home team", team_pool, index=home_default)
     with cmid:
         st.markdown("<div style='text-align:center;padding-top:2rem;font-size:1.5rem'>vs</div>",
                     unsafe_allow_html=True)
     with c2:
         away_default = team_pool.index("France") if "France" in team_pool else 1
-        away_team = st.selectbox("Away team", team_pool, index=away_default,
-                                 format_func=lambda t: f"{FLAGS.get(t, '')} {t}".strip())
+        away_team = st.selectbox("Away team", team_pool, index=away_default)
 
     st.checkbox(f"Show all {len(ALL_TEAMS)} teams", key="show_all_teams",
                 help="Off: only the 48 WC 2026 participants")
@@ -505,43 +587,39 @@ if page == "Match Predictor":
     # Production blend: shrink toward the Elo-logistic prior (same as simulator)
     proba = ELO_BLEND_W * proba + (1 - ELO_BLEND_W) * elo_prior_proba(hs["elo"], as_["elo"])
     predicted_class = int(proba.argmax())
-    outcome_labels  = [
-        f"{FLAGS.get(home_team, '')} {home_team} Win".strip(),
-        "Draw",
-        f"{FLAGS.get(away_team, '')} {away_team} Win".strip(),
-    ]
+    outcome_labels  = [f"{home_team} Win", "Draw", f"{away_team} Win"]
 
     # ── probability display ────────────────────────────────────────────────
-    st.markdown("---")
-    mc1, mc2, mc3 = st.columns(3)
-    mc1.metric(outcome_labels[0], f"{proba[0]*100:.1f}%")
-    mc2.metric("Draw",             f"{proba[1]*100:.1f}%")
-    mc3.metric(outcome_labels[2], f"{proba[2]*100:.1f}%")
-
-    # Stacked probability bar — identity colors (home blue / draw gray /
-    # away amber), not good/bad semantics; flags make segments self-explanatory
+    # Identity colors (home blue / draw gray / away amber), not good/bad
+    # semantics. HTML cards + bar so flag images render on every platform.
     OUTCOME_COLORS = ["#3b82f6", "#6b7280", "#f59e0b"]
-    bar_texts = [
-        f"{FLAGS.get(home_team, '')} {proba[0]*100:.1f}%".strip(),
-        f"{proba[1]*100:.1f}%",
-        f"{FLAGS.get(away_team, '')} {proba[2]*100:.1f}%".strip(),
+
+    st.markdown("---")
+    card_labels = [
+        f"{flag_img(home_team)} {home_team} Win",
+        "Draw",
+        f"{flag_img(away_team)} {away_team} Win",
     ]
-    fig_bar = go.Figure()
-    for i, (label, color) in enumerate(zip(outcome_labels, OUTCOME_COLORS)):
-        fig_bar.add_trace(go.Bar(
-            x=[proba[i]], y=[""], orientation="h",
-            name=label, marker_color=color,
-            text=bar_texts[i], textposition="inside",
-            insidetextanchor="middle",
-            insidetextfont=dict(size=14, color="#ffffff"),
-        ))
-    fig_bar.update_layout(
-        barmode="stack", height=70, showlegend=False,
-        margin=dict(l=0, r=0, t=0, b=0),
-        xaxis=dict(showticklabels=False, range=[0, 1]),
-        yaxis=dict(showticklabels=False),
+    mcols = st.columns(3)
+    for col, label, p, color in zip(mcols, card_labels, proba, OUTCOME_COLORS):
+        col.markdown(
+            f'<div class="prob-card" style="border-left:4px solid {color}">'
+            f'<div class="prob-label">{label}</div>'
+            f'<div class="prob-value">{p*100:.1f}%</div></div>',
+            unsafe_allow_html=True,
+        )
+
+    # Stacked probability bar — pure HTML so flags render and touch scrolling works
+    seg_texts = [
+        f"{flag_img(home_team)} {proba[0]*100:.1f}%",
+        f"{proba[1]*100:.1f}%",
+        f"{flag_img(away_team)} {proba[2]*100:.1f}%",
+    ]
+    segs = "".join(
+        f'<div class="seg" style="width:{p*100:.2f}%;background:{c}">{t}</div>'
+        for p, c, t in zip(proba, OUTCOME_COLORS, seg_texts)
     )
-    st.plotly_chart(fig_bar, use_container_width=True, config=_PLOTLY_CONFIG)
+    st.markdown(f'<div class="prob-bar">{segs}</div>', unsafe_allow_html=True)
 
     # ── team comparison ────────────────────────────────────────────────────
     st.subheader("Team comparison")
@@ -567,6 +645,12 @@ if page == "Match Predictor":
         ],
     }).set_index("")
     st.table(comp_df)
+    st.caption(
+        "**Elo rating** = team strength score built from 150 years of results "
+        "(top teams ≈ 2000+). **Form** = results in the team's most recent "
+        "matches. **GD** = average goal difference (+2.0 means winning by "
+        "2 goals on average)."
+    )
 
     if n_h2h > 0:
         hw_n = round(hwr * n_h2h)
@@ -581,10 +665,12 @@ if page == "Match Predictor":
         )
 
     # ── SHAP explanation ───────────────────────────────────────────────────
-    st.subheader("Why this prediction? (SHAP)")
-    st.caption(
-        f"Top feature contributions toward **{outcome_labels[predicted_class]}** "
-        f"({proba[predicted_class]*100:.1f}%)"
+    st.subheader("What pushed this prediction?")
+    st.markdown(
+        f"Each bar is one factor the model considered. **Red bars pushed the "
+        f"prediction toward {outcome_labels[predicted_class]}** "
+        f"({proba[predicted_class]*100:.1f}%); **blue bars pushed against it**. "
+        f"Longer bar = stronger influence."
     )
 
     # sv shape: (n_samples, n_features, n_classes)
@@ -594,16 +680,17 @@ if page == "Match Predictor":
     sv_series = pd.Series(sv_for_class, index=bundle["feature_cols"])
     top_feats  = sv_series.abs().nlargest(15).index
     sv_top     = sv_series[top_feats].sort_values()
+    nice_names = [FEATURE_LABELS.get(f, f) for f in sv_top.index]
 
     fig_shap = go.Figure(go.Bar(
         x=sv_top.values,
-        y=sv_top.index,
+        y=nice_names,
         orientation="h",
         marker_color=["#e74c3c" if v > 0 else "#2980b9" for v in sv_top.values],
         hovertemplate="%{y}: %{x:.4f}<extra></extra>",
     ))
     fig_shap.update_layout(
-        xaxis_title="SHAP value",
+        xaxis_title="Influence on the prediction",
         height=480,
         margin=dict(l=10, r=20, t=45, b=40),
         yaxis=dict(automargin=True),
@@ -620,11 +707,20 @@ elif page == "Tournament Simulator":
          "Monte Carlo Simulation &nbsp;·&nbsp; 48 Teams &nbsp;·&nbsp; Full Bracket",
          "June 11 – July 19, 2026")
 
+    st.markdown(
+        "This page plays out the **entire World Cup thousands of times** — "
+        "every group game, every knockout round — using the match predictor "
+        "for each game. The more often a team lifts the trophy across those "
+        "simulated tournaments, the higher its championship probability."
+    )
+
     ctrl_l, ctrl_r = st.columns([3, 2])
     with ctrl_l:
-        n_sims = st.slider("Number of simulations", 500, 10_000, 2_000, step=500)
+        n_sims = st.slider("Number of simulations", 500, 10_000, 2_000, step=500,
+                           help="More simulations = more stable percentages, but slower")
     with ctrl_r:
-        seed = int(st.number_input("Random seed", value=42, step=1))
+        seed = int(st.number_input("Random seed", value=42, step=1,
+                                   help="Same seed = same results; change it to reshuffle the randomness"))
 
     run_btn = st.button("▶ Run simulations", type="primary")
 
@@ -643,6 +739,10 @@ elif page == "Tournament Simulator":
 
     # ── championship probability chart ────────────────────────────────────
     st.subheader(f"Championship win probability  ({total:,} simulations)")
+    st.caption(
+        f"How often each team won the whole tournament across {total:,} "
+        f"simulated World Cups. Bar colors show the team's confederation."
+    )
 
     df_wins = (
         pd.DataFrame(wins.items(), columns=["team", "wins"])
@@ -656,15 +756,12 @@ elif page == "Tournament Simulator":
     )
     df_wins["color"] = df_wins["confederation"].map(CONF_COLOR).fillna(CONF_COLOR["Other"])
 
-    df_wins["label"] = df_wins["team"].map(
-        lambda t: f"{FLAGS.get(t, '')} {t}".strip()
-    )
     # reverse so highest probability appears at top of horizontal chart
     dw = df_wins.iloc[::-1].reset_index(drop=True)
 
     fig_wins = go.Figure(go.Bar(
         x=dw["pct"],
-        y=dw["label"],
+        y=dw["team"],
         orientation="h",
         marker_color=dw["color"].tolist(),
         text=dw["pct"].map("{:.1f}%".format),
@@ -714,6 +811,12 @@ elif page == "Tournament Simulator":
         tc  = st.session_state["third_counts"]
         n   = st.session_state["gs_n"]
 
+        st.caption(
+            "How often each team escaped its group: **Top-2 qual %** = finished "
+            "1st or 2nd (guaranteed through). **3rd place %** = finished 3rd — "
+            "at WC 2026 the 8 best third-placed teams also advance."
+        )
+
         gs_rows = []
         for grp, teams in sorted(GROUPS.items()):
             for t in teams:
@@ -743,6 +846,13 @@ else:
          "Elo Ratings &nbsp;·&nbsp; 49,000+ Matches &nbsp;·&nbsp; 1872–2026",
          "336 national teams ranked by predictive strength")
 
+    st.markdown(
+        "**Elo** is a strength score (the same idea used in chess): every team "
+        "starts at 1500 and gains or loses points after each match — beating a "
+        "strong team earns more than beating a weak one. Top national teams "
+        "score around 2000+."
+    )
+
     confs = sorted(elo_df["confederation"].dropna().unique())
     sel   = st.multiselect("Filter by confederation", confs, default=confs)
 
@@ -758,13 +868,12 @@ else:
     top_df["color"] = top_df["confederation"].map(CONF_COLOR).fillna(CONF_COLOR["Other"])
     top_df["wc2026"] = top_df["team"].isin(WC_TEAMS)
 
-    top_df["label"] = top_df["team"].map(lambda t: f"{FLAGS.get(t, '')} {t}".strip())
     # reverse so highest Elo appears at top
     td = top_df.iloc[::-1].reset_index(drop=True)
 
     fig_elo = go.Figure(go.Bar(
         x=td["elo"],
-        y=td["label"],
+        y=td["team"],
         orientation="h",
         marker_color=td["color"].tolist(),
         marker_line_width=td["wc2026"].map(lambda b: 2.5 if b else 0).tolist(),
@@ -792,19 +901,25 @@ else:
     # ── WC 2026 teams table ────────────────────────────────────────────────
     st.markdown("---")
     st.subheader("WC 2026 teams — Elo snapshot")
+    st.caption(
+        "All 48 qualified teams, organised by their group at the tournament. "
+        "Higher Elo = stronger team going in."
+    )
 
     wc_df = (
         elo_df[elo_df["team"].isin(WC_TEAMS)]
         .reset_index(drop=True)
         .rename(columns={"team": "Team", "elo": "Elo", "confederation": "Confederation"})
     )
-    wc_df.index = wc_df.index + 1
 
-    # Add group and flag
+    # Add group and flag image (HTML table so the <img> tags render)
     team_to_group = {t: g for g, ts in GROUPS.items() for t in ts}
     wc_df.insert(0, "Group", wc_df["Team"].map(team_to_group))
-    wc_df.insert(1, "Flag", wc_df["Team"].map(lambda t: FLAGS.get(t, "")))
+    wc_df.insert(1, "Flag", wc_df["Team"].map(flag_img))
     wc_df = wc_df.sort_values("Group")
     wc_df["Elo"] = wc_df["Elo"].map("{:.1f}".format)
 
-    st.table(wc_df)
+    st.markdown(
+        f'<div class="html-table">{wc_df.to_html(escape=False, index=False)}</div>',
+        unsafe_allow_html=True,
+    )
