@@ -1376,23 +1376,31 @@ else:
 
     OUTCOME_COLORS = ["#3b82f6", "#6b7280", "#f59e0b"]
 
-    def _prob_mini_bar(m: dict) -> str:
+    def _wdl_cell(m: dict) -> str:
+        """
+        Each win/draw/loss % sits centered above its own bar segment, so the
+        number maps visually to the segment it describes (Task 7). Label boxes
+        and bar segments share identical flex widths (the segment's share).
+        """
         probs = [m["p_home"], m["p_draw"], m["p_away"]]
         pred  = m["predicted_outcome"]
-        segs = "".join(
-            f'<div style="width:{p*100:.0f}%;background:{c};'
-            f'{"opacity:1" if i == pred else "opacity:0.4"}"></div>'
+        labels = "".join(
+            f'<div style="flex:0 0 {p*100:.4f}%;text-align:center;color:{c};'
+            f'font-size:0.7rem;font-weight:700;white-space:nowrap">{p*100:.0f}%</div>'
+            for p, c in zip(probs, OUTCOME_COLORS)
+        )
+        bar = "".join(
+            f'<div style="flex:0 0 {p*100:.4f}%;background:{c};'
+            f'{"opacity:1" if i == pred else "opacity:0.45"}"></div>'
             for i, (p, c) in enumerate(zip(probs, OUTCOME_COLORS))
         )
-        return (f'<div style="display:flex;height:7px;border-radius:4px;'
-                f'overflow:hidden;width:100%;min-width:96px">{segs}</div>')
-
-    def _wdl_cell(m: dict) -> str:
-        """Percentages with a thin inline probability bar folded underneath."""
-        pp = (f'{m["p_home"]*100:.0f}% / {m["p_draw"]*100:.0f}% / '
-              f'{m["p_away"]*100:.0f}%')
-        return (f'<div style="font-size:0.82rem;color:#93a1c8;margin-bottom:4px">{pp}</div>'
-                f'{_prob_mini_bar(m)}')
+        return (
+            f'<div style="min-width:150px">'
+            f'<div style="display:flex;margin-bottom:3px">{labels}</div>'
+            f'<div style="display:flex;height:9px;border-radius:4px;overflow:hidden">'
+            f'{bar}</div>'
+            f'</div>'
+        )
 
     # Heat scale for the probability the model gave the ACTUAL outcome.
     # Anchored at ~33% (random across 3 outcomes): below trends amber→red,
