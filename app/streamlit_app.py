@@ -1253,8 +1253,15 @@ else:
             f'{"opacity:1" if i == pred else "opacity:0.4"}"></div>'
             for i, (p, c) in enumerate(zip(probs, OUTCOME_COLORS))
         )
-        return (f'<div style="display:flex;height:14px;border-radius:4px;'
-                f'overflow:hidden;min-width:90px">{segs}</div>')
+        return (f'<div style="display:flex;height:7px;border-radius:4px;'
+                f'overflow:hidden;width:100%;min-width:96px">{segs}</div>')
+
+    def _wdl_cell(m: dict) -> str:
+        """Percentages with a thin inline probability bar folded underneath."""
+        pp = (f'{m["p_home"]*100:.0f}% / {m["p_draw"]*100:.0f}% / '
+              f'{m["p_away"]*100:.0f}%')
+        return (f'<div style="font-size:0.82rem;color:#93a1c8;margin-bottom:4px">{pp}</div>'
+                f'{_prob_mini_bar(m)}')
 
     # Heat scale for the probability the model gave the ACTUAL outcome.
     # Anchored at ~33% (random across 3 outcomes): below trends amber→red,
@@ -1303,32 +1310,29 @@ else:
         if m.get("correct") is None:
             continue
         h, a = m["home_team"], m["away_team"]
-        pp = (f'{m["p_home"]*100:.0f}% / {m["p_draw"]*100:.0f}% / '
-              f'{m["p_away"]*100:.0f}%')
         rows.append(
             f'<tr>'
             f'<td>{m["date"]}</td>'
             f'<td>{flag_img(h)} {short_name(h)} '
             f'<b>{m["home_score"]}–{m["away_score"]}</b> '
             f'{short_name(a)} {flag_img(a)}</td>'
-            f'<td>{_prob_mini_bar(m)}</td>'
-            f'<td style="font-size:0.82rem;color:#93a1c8">{pp}</td>'
+            f'<td>{_wdl_cell(m)}</td>'
             f'<td>{_call_cell(m)}</td>'
             f'</tr>'
         )
 
     st.markdown(
         '<div class="html-table"><table><thead><tr>'
-        '<th>Date</th><th>Result</th><th>Prediction</th>'
-        '<th>Win / Draw / Loss</th><th>Call</th>'
+        '<th>Date</th><th>Result</th><th>Win / Draw / Loss</th><th>Call</th>'
         '</tr></thead><tbody>' + "".join(rows) + '</tbody></table></div>',
         unsafe_allow_html=True,
     )
     st.caption(
-        "**Call** shows the probability the model gave the *actual* result, "
-        "colour-coded around a 33% midpoint (one-in-three is random): "
-        "green = the model saw it coming, amber ≈ a coin-toss, red = the model "
-        "was caught out. The small ✓ / ✗ marks whether the model's single top "
-        "pick was right. Prediction bar: win / draw / loss (home blue · draw "
-        "gray · away amber), solid segment = the pick."
+        "**Win / Draw / Loss** lists the model's three probabilities; the thin "
+        "bar beneath shows them visually (home blue · draw gray · away amber), "
+        "solid segment = the model's pick. **Call** shows the probability the "
+        "model gave the *actual* result, colour-coded around a 33% midpoint "
+        "(one-in-three is random): green = the model saw it coming, amber ≈ a "
+        "coin-toss, red = caught out. The small ✓ / ✗ marks whether the top "
+        "pick was right."
     )
