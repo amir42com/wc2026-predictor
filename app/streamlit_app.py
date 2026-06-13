@@ -389,6 +389,7 @@ h1, h2, h3 {
 [data-testid="stMain"] [data-testid="stRadio"] label:has(input:checked) {
     background: linear-gradient(90deg, #2196f3, #4fc3f7);
     border-color: transparent;
+    box-shadow: 0 2px 14px rgba(79, 195, 247, 0.40);
 }
 [data-testid="stMain"] [data-testid="stRadio"] label:has(input:checked) p {
     color: #fff; font-weight: 600;
@@ -402,6 +403,16 @@ h1, h2, h3 {
     top: 56px;
     z-index: 99;
     background: #0c1124;
+    /* overflow visible + horizontal padding so the active pill's rounded
+       edge and glow aren't clipped or flush to the container edge (Task 6) */
+    overflow: visible;
+    padding: 0.55rem 0.7rem;
+    margin: 0 -0.7rem;
+    border-bottom: 1px solid #1d2547;
+}
+[data-testid="stMain"] [data-testid="stRadio"],
+[data-testid="stMain"] [data-testid="stRadio"] [role="radiogroup"] {
+    overflow: visible;
 }
 
 /* ── tables ── */
