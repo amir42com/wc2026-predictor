@@ -323,9 +323,19 @@ h1, h2, h3 {
 }
 
 /* ── HTML tables (flag images need unescaped HTML) ── */
-/* defensive: scroll within the card on very narrow screens instead of
-   pushing the page width (responsive safety net) */
-.html-table { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+/* Only the table scrolls sideways on narrow screens — never the page.
+   max-width:100% keeps the wrapper inside its column; a thin styled
+   scrollbar makes the horizontal scroll discoverable (Task 5). */
+.html-table {
+    overflow-x: auto;
+    max-width: 100%;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: #2a3560 transparent;
+}
+.html-table::-webkit-scrollbar { height: 6px; }
+.html-table::-webkit-scrollbar-thumb { background: #2a3560; border-radius: 3px; }
+.html-table::-webkit-scrollbar-track { background: transparent; }
 .html-table table {
     width: 100%; border-collapse: collapse;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
