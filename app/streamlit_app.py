@@ -3,7 +3,6 @@ WC 2026 Prediction Dashboard
 Run: streamlit run app/streamlit_app.py
 """
 
-import base64
 import json
 import sys
 from collections import Counter
@@ -225,27 +224,11 @@ RADAR_SVG = """
 </svg>
 """
 
-# Compact favicon variant — bolder strokes + filled navy disc so it reads at 16px.
-RADAR_FAVICON = (
-    '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">'
-    '<circle cx="16" cy="16" r="15" fill="#0c1124"/>'
-    '<circle cx="16" cy="16" r="13" fill="none" stroke="#4fc3f7" stroke-opacity="0.85" stroke-width="2"/>'
-    '<circle cx="16" cy="16" r="7" fill="none" stroke="#4fc3f7" stroke-opacity="0.45" stroke-width="1.5"/>'
-    '<line x1="16" y1="3" x2="16" y2="29" stroke="#4fc3f7" stroke-opacity="0.3" stroke-width="1"/>'
-    '<line x1="3" y1="16" x2="29" y2="16" stroke="#4fc3f7" stroke-opacity="0.3" stroke-width="1"/>'
-    '<path d="M16 16 L16 3 A13 13 0 0 1 27 9 Z" fill="#4fc3f7" fill-opacity="0.5"/>'
-    '<circle cx="23" cy="10" r="2.2" fill="#4fc3f7"/>'
-    '</svg>'
-)
-_FAVICON_DATA_URI = ("data:image/svg+xml;base64,"
-                     + base64.b64encode(RADAR_FAVICON.encode()).decode())
-
-
 # ── page config ────────────────────────────────────────────────────────────
 
 st.set_page_config(
     page_title="WC 2026 Predictor · Amir Mohammadi",
-    page_icon=_FAVICON_DATA_URI,
+    page_icon="⚽",   # browser-tab favicon (football); in-page hero uses RADAR_SVG
     layout="wide",
     initial_sidebar_state="expanded",
     menu_items={
