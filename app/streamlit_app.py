@@ -1199,9 +1199,9 @@ else:
     n_correct  = sum(m["correct"] for m in scored)
     acc        = n_correct / n
 
-    # Model vs naive Elo-baseline log-loss (both leakage-free, pre-tournament)
+    # Model vs naive Elo-baseline metrics (both leakage-free, pre-tournament)
     eps = 1e-15
-    model_ll, base_ll = [], []
+    model_ll, base_ll, base_correct = [], [], 0
     for m in scored:
         a = m["actual_outcome"]
         pm = np.clip([m["p_home"], m["p_draw"], m["p_away"]], eps, 1)
@@ -1210,33 +1210,60 @@ else:
         ea = predictor._state.get(m["away_team"], predictor._default_state())["elo"]
         pb = np.clip(elo_prior_proba(eh, ea), eps, 1)
         base_ll.append(-np.log(pb[a]))
-    model_ll = float(np.mean(model_ll))
-    base_ll  = float(np.mean(base_ll))
-    ll_delta = base_ll - model_ll  # positive = model beats baseline
+        if int(np.argmax(pb)) == a:
+            base_correct += 1
+    model_ll  = float(np.mean(model_ll))
+    base_ll   = float(np.mean(base_ll))
+    base_acc  = base_correct / n
+    acc_delta = (acc - base_acc) * 100          # percentage points; +ve = good
+    ll_gap    = model_ll - base_ll              # +ve = trailing (worse)
 
+    # Prominent small-sample caveat — these numbers are not final
+    st.markdown(
+        f'<div style="display:inline-block;background:rgba(245,158,11,0.12);'
+        f'border:1px solid rgba(245,158,11,0.4);color:#f0b54a;border-radius:999px;'
+        f'padding:3px 13px;font-size:0.8rem;font-weight:600;margin-bottom:0.7rem">'
+        f'⚠ Small sample — through {n} match{"es" if n != 1 else ""}, '
+        f'expect these to swing</div>',
+        unsafe_allow_html=True,
+    )
+
+    def _chip(text: str, is_good: bool) -> str:
+        col = "#2ecc71" if is_good else "#e57373"
+        bg  = "rgba(46,204,113,0.13)" if is_good else "rgba(229,115,115,0.13)"
+        return (f'<span style="display:inline-block;background:{bg};'
+                f'border:1px solid {col}55;color:{col};border-radius:999px;'
+                f'padding:1px 8px;font-size:0.72rem;font-weight:600">{text}</span>')
+
+    # Cohesive cyan/blue family — colour carries NO good/bad meaning
     s1, s2, s3 = st.columns(3)
     cards = [
-        (s1, "#3b82f6", "Matches tracked", f"{n}", f"{payload.get('n_matches', n)} finished"),
-        (s2, "#2ecc71", "Correct predictions", f"{acc*100:.0f}%", f"{n_correct} of {n}"),
-        (s3, "#f59e0b", "Model log-loss",
-         f"{model_ll:.3f}",
-         (f"{'beats' if ll_delta >= 0 else 'trails'} Elo baseline "
-          f"({base_ll:.3f})")),
+        (s1, "#4fc3f7", "Matches tracked", f"{n}",
+         f'<span style="color:#5b6379;font-size:0.8rem">'
+         f'{payload.get("n_matches", n)} finished so far</span>'),
+        (s2, "#38bdf8", "Correct predictions", f"{acc*100:.0f}%",
+         _chip(f"{acc_delta:+.0f} pp vs Elo", acc_delta >= 0)
+         + f' <span style="color:#5b6379;font-size:0.78rem">{n_correct} of {n}</span>'),
+        (s3, "#60a5fa", "Model log-loss", f"{model_ll:.3f}",
+         _chip(f"{ll_gap:+.3f} vs Elo", ll_gap <= 0)
+         + f' <span style="color:#5b6379;font-size:0.78rem">lower is better</span>'),
     ]
     for col, color, label, value, sub in cards:
         col.markdown(
             f'<div class="prob-card" style="border-left:4px solid {color}">'
             f'<div class="prob-label">{label}</div>'
             f'<div class="prob-value">{value}</div>'
-            f'<div style="color:#5b6379;font-size:0.8rem;margin-top:0.25rem">{sub}</div>'
+            f'<div style="margin-top:0.35rem">{sub}</div>'
             f'</div>',
             unsafe_allow_html=True,
         )
 
     st.caption(
+        "Card colours are neutral; the green/red **chips** carry the verdict "
+        "versus the **Elo baseline** (the simple \"stronger team wins\" rule). "
         "**Log-loss** rewards confident correct calls and punishes confident "
-        "wrong ones (lower is better). The **Elo baseline** is the simple "
-        "\"stronger team wins\" rule — beating it means the model adds real value."
+        "wrong ones — lower is better, so a negative gap means the model beats "
+        "the baseline."
     )
 
     # ── results table ──────────────────────────────────────────────────────
