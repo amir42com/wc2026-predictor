@@ -1256,13 +1256,53 @@ else:
         return (f'<div style="display:flex;height:14px;border-radius:4px;'
                 f'overflow:hidden;min-width:90px">{segs}</div>')
 
+    # Heat scale for the probability the model gave the ACTUAL outcome.
+    # Anchored at ~33% (random across 3 outcomes): below trends amber→red,
+    # above trends green, deep green only past ~60%.
+    _HEAT_ANCHORS = [
+        (0.00, (176,  42,  42)),   # deep red
+        (0.20, (231,  76,  60)),   # red
+        (0.33, (245, 158,  11)),   # amber (≈ random baseline)
+        (0.50, (150, 196,  70)),   # yellow-green
+        (0.60, ( 46, 204, 113)),   # green
+        (1.00, ( 22, 128,  70)),   # deep green
+    ]
+
+    def _heat_rgb(p: float) -> tuple[int, int, int]:
+        if p <= _HEAT_ANCHORS[0][0]:
+            return _HEAT_ANCHORS[0][1]
+        if p >= _HEAT_ANCHORS[-1][0]:
+            return _HEAT_ANCHORS[-1][1]
+        for (p0, c0), (p1, c1) in zip(_HEAT_ANCHORS, _HEAT_ANCHORS[1:]):
+            if p0 <= p <= p1:
+                t = (p - p0) / (p1 - p0)
+                return tuple(int(round(c0[i] + t * (c1[i] - c0[i]))) for i in range(3))
+        return _HEAT_ANCHORS[-1][1]
+
+    def _lighten(rgb: tuple[int, int, int], t: float = 0.35) -> tuple[int, int, int]:
+        return tuple(int(round(c + t * (255 - c))) for c in rgb)
+
+    def _call_cell(m: dict) -> str:
+        """Gradient badge = P(actual outcome); subtle ✓/✗ = was top pick right."""
+        probs   = [m["p_home"], m["p_draw"], m["p_away"]]
+        p_act   = probs[m["actual_outcome"]]
+        r, g, b = _heat_rgb(p_act)
+        lr, lg, lb = _lighten((r, g, b))
+        mark     = "✓" if m["correct"] else "✗"
+        mark_col = "#7fd99a" if m["correct"] else "#e57373"
+        return (
+            f'<span style="display:inline-block;padding:2px 9px;border-radius:7px;'
+            f'background:rgba({r},{g},{b},0.18);border:1px solid rgba({r},{g},{b},0.5);'
+            f'color:rgb({lr},{lg},{lb});font-weight:700">{p_act*100:.0f}%</span> '
+            f'<span style="color:{mark_col};opacity:.7;font-size:.85rem" '
+            f'title="top pick {"correct" if m["correct"] else "wrong"}">{mark}</span>'
+        )
+
     rows = []
     for m in matches:
         if m.get("correct") is None:
             continue
         h, a = m["home_team"], m["away_team"]
-        result_col = ("#2ecc71" if m["correct"] else "#e74c3c")
-        mark = "✅" if m["correct"] else "❌"
         pp = (f'{m["p_home"]*100:.0f}% / {m["p_draw"]*100:.0f}% / '
               f'{m["p_away"]*100:.0f}%')
         rows.append(
@@ -1273,7 +1313,7 @@ else:
             f'{short_name(a)} {flag_img(a)}</td>'
             f'<td>{_prob_mini_bar(m)}</td>'
             f'<td style="font-size:0.82rem;color:#93a1c8">{pp}</td>'
-            f'<td style="color:{result_col};font-weight:600">{mark}</td>'
+            f'<td>{_call_cell(m)}</td>'
             f'</tr>'
         )
 
@@ -1285,7 +1325,10 @@ else:
         unsafe_allow_html=True,
     )
     st.caption(
-        "Prediction bar shows the model's win / draw / loss probabilities "
-        "(home blue · draw gray · away amber); the solid segment was the "
-        "model's pick. ✅ = correct, ❌ = wrong."
+        "**Call** shows the probability the model gave the *actual* result, "
+        "colour-coded around a 33% midpoint (one-in-three is random): "
+        "green = the model saw it coming, amber ≈ a coin-toss, red = the model "
+        "was caught out. The small ✓ / ✗ marks whether the model's single top "
+        "pick was right. Prediction bar: win / draw / loss (home blue · draw "
+        "gray · away amber), solid segment = the pick."
     )
