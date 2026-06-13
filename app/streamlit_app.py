@@ -378,6 +378,7 @@ h1, h2, h3 {
 /* ── top navigation pills ── */
 [data-testid="stMain"] [data-testid="stRadio"] [role="radiogroup"] {
     display: flex; gap: 0.5rem; flex-wrap: wrap;
+    justify-content: center;   /* center tabs within the full-width bar */
 }
 [data-testid="stMain"] [data-testid="stRadio"] label {
     background: #151d3b;
@@ -406,12 +407,20 @@ h1, h2, h3 {
     top: 56px;
     z-index: 99;
     background: #0c1124;
-    /* overflow visible + horizontal padding so the active pill's rounded
-       edge and glow aren't clipped or flush to the container edge (Task 6) */
     overflow: visible;
     padding: 0.55rem 0.7rem;
-    margin: 0 -0.7rem;
+    /* full-bleed: cancel the block-container's horizontal padding so the bar
+       spans the full main-content width. Base -1rem is <= the minimum 1rem
+       padding at any width (overflow-safe); desktop gets -5rem only where the
+       padding is confirmed 5rem. FRAGILE: tied to Streamlit's padding values
+       and ~864px breakpoint. */
+    margin-inline: -1rem;
     border-bottom: 1px solid #1d2547;
+}
+@media (min-width: 864px) {
+    [data-testid="stMain"] [data-testid="stElementContainer"]:has(> [data-testid="stRadio"]) {
+        margin-inline: -5rem;
+    }
 }
 [data-testid="stMain"] [data-testid="stRadio"],
 [data-testid="stMain"] [data-testid="stRadio"] [role="radiogroup"] {
