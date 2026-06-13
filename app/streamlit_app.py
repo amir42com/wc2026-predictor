@@ -394,6 +394,16 @@ h1, h2, h3 {
     color: #fff; font-weight: 600;
 }
 
+/* sticky nav: pin the radio's container below Streamlit's ~60px top toolbar.
+   FRAGILE: relies on Streamlit DOM testids + header height. */
+[data-testid="stHeader"] { background: #0c1124; }
+[data-testid="stMain"] [data-testid="stElementContainer"]:has(> [data-testid="stRadio"]) {
+    position: sticky;
+    top: 56px;
+    z-index: 99;
+    background: #0c1124;
+}
+
 /* ── tables ── */
 [data-testid="stTable"] {
     border: 1px solid #26305a;
