@@ -677,7 +677,7 @@ st.sidebar.markdown(f"""
 
 page = st.radio(
     "Navigate",
-    ["Match Predictor", "Tournament Simulator", "Team Rankings", "📡 Prediction Tracker"],
+    ["Match Predictor", "Tournament Simulator", "Team Rankings", "Prediction Tracker"],
     horizontal=True,
     label_visibility="collapsed",
 )
