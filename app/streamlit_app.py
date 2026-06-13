@@ -340,6 +340,9 @@ h1, h2, h3 {
 }
 
 /* ── HTML tables (flag images need unescaped HTML) ── */
+/* defensive: scroll within the card on very narrow screens instead of
+   pushing the page width (responsive safety net) */
+.html-table { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .html-table table {
     width: 100%; border-collapse: collapse;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
