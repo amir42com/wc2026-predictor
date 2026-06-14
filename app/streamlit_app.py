@@ -750,18 +750,28 @@ page = st.radio(
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
+def _cached_next_fixture() -> dict:
+    """
+    Hourly-cached next WC fixture. Raises on no-fixture/API-failure on purpose:
+    st.cache_data does NOT cache exceptions, so a transient failure isn't pinned
+    for the whole hour — the next load retries instead of serving a stale fallback.
+    """
+    fx = fetch_results.get_next_fixture()
+    if not fx:
+        raise RuntimeError("no upcoming fixture")
+    return fx
+
+
 def next_fixture_defaults() -> tuple[str, str]:
     """
     Default (home, away) for the Match Predictor = the next upcoming WC 2026
-    fixture (hourly-cached). Each team must be a valid WC participant; anything
-    unmatched falls back to a sensible default. Never raises.
+    fixture. Each team must be a valid WC participant; anything unmatched or any
+    API failure falls back to a sensible default. Never raises.
     """
     fallback = ("Argentina", "France")
     try:
-        fx = fetch_results.get_next_fixture()
+        fx = _cached_next_fixture()
     except Exception:
-        fx = None
-    if not fx:
         return fallback
     home = fx.get("home") if fx.get("home") in WC_TEAMS else fallback[0]
     away = fx.get("away") if fx.get("away") in WC_TEAMS else fallback[1]
