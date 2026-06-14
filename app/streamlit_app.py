@@ -442,27 +442,61 @@ h1, h2, h3 {
     overflow: visible;
 }
 
-/* Task 2 — mobile: one centered, horizontally-scrollable row of tabs.
-   `safe center` centers when they fit, falls back to scrollable start when
-   they overflow (so the first tab is never cut off). */
+/* Task 2 — mobile: all 4 destinations on one row, each a small icon ABOVE a
+   short label, evenly distributed with NO horizontal scroll. The real (long)
+   label text is collapsed and the icon + short label are injected per position.
+   ORDER-DEPENDENT: the nth-of-type list must match the st.radio options order
+   (Match Predictor, Tournament Simulator, Team Rankings, Prediction Tracker). */
 @media (max-width: 768px) {
     [data-testid="stMain"] [data-testid="stRadio"] [role="radiogroup"] {
         flex-wrap: nowrap;
-        justify-content: safe center;
-        overflow-x: auto;
-        overflow-y: visible;
-        -webkit-overflow-scrolling: touch;
-        scrollbar-width: none;
-        gap: 0.5rem;
-        padding: 2px 2px 4px;
+        justify-content: space-between;
+        gap: 4px;
+        width: 100%;
+        overflow: visible;
+        padding: 2px 0 4px;
     }
-    [data-testid="stMain"] [data-testid="stRadio"] [role="radiogroup"]::-webkit-scrollbar {
-        display: none;
-    }
-    [data-testid="stMain"] [data-testid="stRadio"] label {
-        flex: 0 0 auto;            /* keep full size; don't squash */
+    [data-testid="stMain"] [data-testid="stRadio"] [role="radiogroup"] > label {
+        flex: 1 1 0;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 3px;
+        background: transparent;
+        border: none;
+        box-shadow: none;
+        border-radius: 12px;
+        padding: 6px 2px;
         white-space: nowrap;
-        padding: 0.5rem 1rem;      /* comfortable touch target */
+    }
+    /* collapse the real (long) label text */
+    [data-testid="stMain"] [data-testid="stRadio"] [role="radiogroup"] > label p {
+        font-size: 0; line-height: 0; height: 0; margin: 0;
+    }
+    /* icon (above) + short label (below), injected per position */
+    [data-testid="stMain"] [data-testid="stRadio"] [role="radiogroup"] > label::before {
+        font-family: "Noto Color Emoji", "Segoe UI Emoji", sans-serif;
+        font-size: 1.3rem; line-height: 1;
+    }
+    [data-testid="stMain"] [data-testid="stRadio"] [role="radiogroup"] > label::after {
+        font-size: 0.7rem; line-height: 1; color: #93a1c8; font-weight: 600;
+    }
+    [data-testid="stMain"] [data-testid="stRadio"] [role="radiogroup"] > label:nth-of-type(1)::before { content: "⚽"; }
+    [data-testid="stMain"] [data-testid="stRadio"] [role="radiogroup"] > label:nth-of-type(1)::after  { content: "Predict"; }
+    [data-testid="stMain"] [data-testid="stRadio"] [role="radiogroup"] > label:nth-of-type(2)::before { content: "🏆"; }
+    [data-testid="stMain"] [data-testid="stRadio"] [role="radiogroup"] > label:nth-of-type(2)::after  { content: "Simulate"; }
+    [data-testid="stMain"] [data-testid="stRadio"] [role="radiogroup"] > label:nth-of-type(3)::before { content: "📊"; }
+    [data-testid="stMain"] [data-testid="stRadio"] [role="radiogroup"] > label:nth-of-type(3)::after  { content: "Rankings"; }
+    [data-testid="stMain"] [data-testid="stRadio"] [role="radiogroup"] > label:nth-of-type(4)::before { content: "📡"; }
+    [data-testid="stMain"] [data-testid="stRadio"] [role="radiogroup"] > label:nth-of-type(4)::after  { content: "Tracker"; }
+    /* active highlight (no pill; tint + accent label) */
+    [data-testid="stMain"] [data-testid="stRadio"] [role="radiogroup"] > label:has(input:checked) {
+        background: rgba(79, 195, 247, 0.12);
+        box-shadow: none;
+    }
+    [data-testid="stMain"] [data-testid="stRadio"] [role="radiogroup"] > label:has(input:checked)::after {
+        color: #4fc3f7; font-weight: 700;
     }
 }
 
