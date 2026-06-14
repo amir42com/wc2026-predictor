@@ -96,6 +96,45 @@ def fetch_raw_matches(key: str, timeout: int = 30) -> list[dict]:
     return resp.json().get("matches", [])
 
 
+def get_next_fixture() -> dict | None:
+    """
+    Next upcoming WC 2026 fixture, with team names normalized to the app's names:
+        {"home": str, "away": str, "utc": str, "status": str}
+
+    A currently-live match (IN_PLAY/PAUSED) is treated as the current/next one;
+    otherwise the earliest future kickoff (TIMED/SCHEDULED) is used. Filtered to
+    the World Cup competition via API_URL. Returns None on any failure or when
+    there is no upcoming fixture, so the caller can fall back gracefully.
+    """
+    try:
+        key = get_api_key()
+        if not key:
+            return None
+        raw = fetch_raw_matches(key)
+    except Exception:
+        return None
+
+    live, upcoming = [], []
+    for m in raw:
+        status = m.get("status")
+        if status in ("IN_PLAY", "PAUSED"):
+            live.append(m)
+        elif status in ("TIMED", "SCHEDULED"):
+            upcoming.append(m)
+
+    pool = live or upcoming
+    if not pool:
+        return None
+    pick = min(pool, key=lambda m: m.get("utcDate") or "9999-12-31")
+
+    home = map_team((pick.get("homeTeam") or {}).get("name"))
+    away = map_team((pick.get("awayTeam") or {}).get("name"))
+    if not home or not away:
+        return None
+    return {"home": home, "away": away,
+            "utc": pick.get("utcDate"), "status": pick.get("status")}
+
+
 def score_matches(raw_matches: list[dict], predictor: Predictor) -> list[dict]:
     """Keep FINISHED matches; attach model probabilities and correctness."""
     out: list[dict] = []
