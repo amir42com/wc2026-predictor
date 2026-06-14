@@ -5,6 +5,7 @@ Run: streamlit run app/streamlit_app.py
 
 import json
 import sys
+import urllib.parse
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
@@ -215,34 +216,11 @@ def _bootstrap_if_needed() -> None:
     st.rerun()
 
 
-# ── radar-sweep brand mark (inline SVG; theme accent #4fc3f7) ───────────────
-# Header mark — concentric rings, crosshair, translucent sweep wedge, one blip.
-RADAR_SVG = """
-<svg width="58" height="58" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <radialGradient id="radarSweep" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#4fc3f7" stop-opacity="0.55"/>
-      <stop offset="100%" stop-color="#4fc3f7" stop-opacity="0"/>
-    </radialGradient>
-  </defs>
-  <circle cx="32" cy="32" r="28" stroke="#4fc3f7" stroke-opacity="0.38" stroke-width="1.5"/>
-  <circle cx="32" cy="32" r="19" stroke="#4fc3f7" stroke-opacity="0.26" stroke-width="1.2"/>
-  <circle cx="32" cy="32" r="10" stroke="#4fc3f7" stroke-opacity="0.22" stroke-width="1.2"/>
-  <line x1="32" y1="4" x2="32" y2="60" stroke="#4fc3f7" stroke-opacity="0.18" stroke-width="1"/>
-  <line x1="4" y1="32" x2="60" y2="32" stroke="#4fc3f7" stroke-opacity="0.18" stroke-width="1"/>
-  <path d="M32 32 L32 4 A28 28 0 0 1 56 18 Z" fill="url(#radarSweep)"/>
-  <line x1="32" y1="32" x2="56" y2="18" stroke="#4fc3f7" stroke-opacity="0.75" stroke-width="1.5"/>
-  <circle cx="45" cy="19" r="5" fill="#4fc3f7" fill-opacity="0.22"/>
-  <circle cx="45" cy="19" r="2.4" fill="#4fc3f7"/>
-  <circle cx="32" cy="32" r="1.8" fill="#4fc3f7"/>
-</svg>
-"""
-
 # ── page config ────────────────────────────────────────────────────────────
 
 st.set_page_config(
     page_title="WC 2026 Predictor · Amir Mohammadi",
-    page_icon="⚽",   # browser-tab favicon (football); in-page hero uses RADAR_SVG
+    page_icon="⚽",   # browser-tab favicon (football)
     layout="wide",
     initial_sidebar_state="expanded",
     menu_items={
@@ -261,6 +239,57 @@ _bootstrap_if_needed()
 
 bundle, predictor, explainer, elo_df = load_resources()
 ALL_TEAMS = sorted(predictor._state.keys())
+
+# ── page icons (Tabler outline set; monochrome, accent-coloured) ────────────
+# Each page uses the same icon in its nav item and (on desktop) its hero.
+# Path data copied verbatim from @tabler/icons outline SVGs (all four verified
+# to exist: swords, trophy, list-numbers, target).
+_ACCENT = "#4fc3f7"
+_TABLER_PATHS: dict[str, list[str]] = {
+    "swords": [
+        "M21 3v5l-11 9l-4 4l-3 -3l4 -4l9 -11l5 0",
+        "M5 13l6 6",
+        "M14.32 17.32l3.68 3.68l3 -3l-3.365 -3.365",
+        "M10 5.5l-2 -2.5h-5v5l3 2.5",
+    ],
+    "trophy": [
+        "M8 21l8 0", "M12 17l0 4", "M7 4l10 0",
+        "M17 4v8a5 5 0 0 1 -10 0v-8",
+        "M3 9a2 2 0 1 0 4 0a2 2 0 1 0 -4 0",
+        "M17 9a2 2 0 1 0 4 0a2 2 0 1 0 -4 0",
+    ],
+    "list-numbers": [
+        "M11 6h9", "M11 12h9", "M12 18h8",
+        "M4 16a2 2 0 1 1 4 0c0 .591 -.5 1 -1 1.5l-3 2.5h4",
+        "M6 10v-6l-2 2",
+    ],
+    "target": [
+        "M11 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0",
+        "M7 12a5 5 0 1 0 10 0a5 5 0 1 0 -10 0",
+        "M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0",
+    ],
+}
+
+
+def tabler_svg(name: str, stroke: str = "currentColor", size: int = 24) -> str:
+    """Inline Tabler outline SVG; monochrome (colour via `stroke`/currentColor)."""
+    body = "".join(f'<path d="{d}"/>' for d in _TABLER_PATHS[name])
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" '
+            f'viewBox="0 0 24 24" fill="none" stroke="{stroke}" stroke-width="2" '
+            f'stroke-linecap="round" stroke-linejoin="round">{body}</svg>')
+
+
+def _tabler_data_uri(name: str, stroke: str, size: int = 22) -> str:
+    return "data:image/svg+xml," + urllib.parse.quote(tabler_svg(name, stroke=stroke, size=size))
+
+
+# Nav order must match the st.radio options; hero of each page reuses the same icon.
+NAV_ICON_ORDER = ["swords", "trophy", "list-numbers", "target"]
+HERO_PREDICT  = tabler_svg("swords")
+HERO_SIMULATE = tabler_svg("trophy")
+HERO_RANKINGS = tabler_svg("list-numbers")
+HERO_TRACKER  = tabler_svg("target")
+
 
 # ── design system: "Midnight Pitch" ─────────────────────────────────────────
 # Deep navy surfaces + electric sky-blue accent (#4fc3f7), Sora for headings.
@@ -474,21 +503,18 @@ h1, h2, h3 {
     [data-testid="stMain"] [data-testid="stRadio"] [role="radiogroup"] > label p {
         font-size: 0; line-height: 0; height: 0; margin: 0;
     }
-    /* icon (above) + short label (below), injected per position */
+    /* icon (above) + short label (below). The Tabler SVG per position is
+       injected as a content:url() image in a separate generated <style>
+       (see _nav_icon_css) — these rules set size + the short labels. */
     [data-testid="stMain"] [data-testid="stRadio"] [role="radiogroup"] > label::before {
-        font-family: "Noto Color Emoji", "Segoe UI Emoji", sans-serif;
-        font-size: 1.3rem; line-height: 1;
+        display: inline-block; width: 1.45rem; height: 1.45rem; line-height: 0;
     }
     [data-testid="stMain"] [data-testid="stRadio"] [role="radiogroup"] > label::after {
         font-size: 0.7rem; line-height: 1; color: #93a1c8; font-weight: 600;
     }
-    [data-testid="stMain"] [data-testid="stRadio"] [role="radiogroup"] > label:nth-of-type(1)::before { content: "⚽"; }
     [data-testid="stMain"] [data-testid="stRadio"] [role="radiogroup"] > label:nth-of-type(1)::after  { content: "Predict"; }
-    [data-testid="stMain"] [data-testid="stRadio"] [role="radiogroup"] > label:nth-of-type(2)::before { content: "🏆"; }
     [data-testid="stMain"] [data-testid="stRadio"] [role="radiogroup"] > label:nth-of-type(2)::after  { content: "Simulate"; }
-    [data-testid="stMain"] [data-testid="stRadio"] [role="radiogroup"] > label:nth-of-type(3)::before { content: "📊"; }
     [data-testid="stMain"] [data-testid="stRadio"] [role="radiogroup"] > label:nth-of-type(3)::after  { content: "Rankings"; }
-    [data-testid="stMain"] [data-testid="stRadio"] [role="radiogroup"] > label:nth-of-type(4)::before { content: "📡"; }
     [data-testid="stMain"] [data-testid="stRadio"] [role="radiogroup"] > label:nth-of-type(4)::after  { content: "Tracker"; }
     /* active highlight (no pill; tint + accent label) */
     [data-testid="stMain"] [data-testid="stRadio"] [role="radiogroup"] > label:has(input:checked) {
@@ -616,7 +642,10 @@ hr { border-color: #1d2547 !important; margin: 1.6rem 0 !important; }
     border: 1px solid rgba(255, 255, 255, 0.05);
 }
 .hero > * { position: relative; z-index: 1; }
-.hero .hero-icon { font-size: 2.6rem; line-height: 1; }
+.hero .hero-icon { line-height: 0; color: #4fc3f7; margin-bottom: 0.2rem; }
+.hero .hero-icon svg { width: 3rem; height: 3rem; }
+/* mobile: drop the hero icon entirely to keep the banner compact */
+@media (max-width: 768px) { .hero .hero-icon { display: none; } }
 .hero h1 {
     margin: 0.35rem 0 0.25rem 0;
     font-size: clamp(1.6rem, 5vw, 2.5rem);
@@ -642,6 +671,17 @@ hr { border-color: #1d2547 !important; margin: 1.6rem 0 !important; }
 }
 </style>
 """, unsafe_allow_html=True)
+
+# Mobile nav icons: inject each Tabler SVG (accent-coloured) as a content:url()
+# image, generated in Python so the data URIs are URL-encoded correctly. Mobile
+# only — desktop nav stays text pills. Order matches NAV_ICON_ORDER / st.radio.
+_nav_icon_css = "\n".join(
+    f'[data-testid="stMain"] [data-testid="stRadio"] [role="radiogroup"] > '
+    f'label:nth-of-type({i})::before {{ content: url("{_tabler_data_uri(name, _ACCENT)}"); }}'
+    for i, name in enumerate(NAV_ICON_ORDER, start=1)
+)
+st.markdown(f"<style>@media (max-width: 768px) {{\n{_nav_icon_css}\n}}</style>",
+            unsafe_allow_html=True)
 
 
 def hero(icon: str, title: str, subtitle: str, tagline: str) -> None:
@@ -783,7 +823,7 @@ def next_fixture_defaults() -> tuple[str, str]:
 # ══════════════════════════════════════════════════════════════════════════
 
 if page == "Match Predictor":
-    hero("⚽", "FIFA WORLD CUP 2026",
+    hero(HERO_PREDICT, "FIFA WORLD CUP 2026",
          "United States &nbsp;·&nbsp; Canada &nbsp;·&nbsp; Mexico",
          "June 11 – July 19, 2026")
 
@@ -1053,7 +1093,7 @@ if page == "Match Predictor":
 # ══════════════════════════════════════════════════════════════════════════
 
 elif page == "Tournament Simulator":
-    hero("🏆", "TOURNAMENT SIMULATOR",
+    hero(HERO_SIMULATE, "TOURNAMENT SIMULATOR",
          "Monte Carlo Simulation &nbsp;·&nbsp; 48 Teams &nbsp;·&nbsp; Full Bracket",
          "June 11 – July 19, 2026")
 
@@ -1226,7 +1266,7 @@ elif page == "Tournament Simulator":
 # ══════════════════════════════════════════════════════════════════════════
 
 elif page == "Team Rankings":
-    hero("📊", "TEAM RANKINGS",
+    hero(HERO_RANKINGS, "TEAM RANKINGS",
          "Elo Ratings &nbsp;·&nbsp; 49,000+ Matches &nbsp;·&nbsp; 1872–2026",
          "336 national teams ranked by predictive strength")
 
@@ -1326,7 +1366,7 @@ elif page == "Team Rankings":
 # ══════════════════════════════════════════════════════════════════════════
 
 else:
-    hero(RADAR_SVG, "PREDICTION TRACKER",
+    hero(HERO_TRACKER, "PREDICTION TRACKER",
          "Model vs Reality &nbsp;·&nbsp; Live WC 2026 Results",
          "How the model's pre-tournament predictions are holding up")
 
