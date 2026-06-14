@@ -386,6 +386,7 @@ h1, h2, h3 {
 [data-testid="stMain"] [data-testid="stRadio"] [role="radiogroup"] {
     display: flex; gap: 0.5rem; flex-wrap: wrap;
     justify-content: center;   /* center tabs within the full-width bar */
+    width: 100%;               /* fill the bar so centering actually centers */
 }
 [data-testid="stMain"] [data-testid="stRadio"] label {
     background: #151d3b;
@@ -422,11 +423,18 @@ h1, h2, h3 {
        padding is confirmed 5rem. FRAGILE: tied to Streamlit's padding values
        and ~864px breakpoint. */
     margin-inline: -1rem;
+    /* stretch to the full main-content width (Streamlit caps containers at
+       max-width:100%, which clamps the bar to the content column and leaves
+       the tabs + underline left-aligned). width = content + cancelled padding. */
+    width: calc(100% + 2rem);
+    max-width: none;
+    box-sizing: border-box;
     border-bottom: 1px solid #1d2547;
 }
 @media (min-width: 864px) {
     [data-testid="stMain"] [data-testid="stElementContainer"]:has(> [data-testid="stRadio"]) {
         margin-inline: -5rem;
+        width: calc(100% + 10rem);
     }
 }
 [data-testid="stMain"] [data-testid="stRadio"],
