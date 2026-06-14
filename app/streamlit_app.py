@@ -500,6 +500,23 @@ h1, h2, h3 {
     }
 }
 
+/* ── Match Predictor "vs" divider ──
+   Desktop: padded down to sit beside the dropdowns (unchanged look). */
+.vs-divider { text-align: center; padding-top: 2rem; font-size: 1.5rem; color: #cdd6ee; }
+/* Mobile: columns stack, so the big top padding becomes dead space — compact
+   it into a slim inline divider and tighten the gap between the stacked
+   dropdowns. Scoped to the selector row via :has(.vs-divider). */
+@media (max-width: 768px) {
+    .vs-divider {
+        padding-top: 0; margin: 0; font-size: 0.9rem;
+        font-weight: 600; color: #93a1c8; letter-spacing: 0.05em;
+    }
+    [data-testid="stHorizontalBlock"]:has(.vs-divider) { gap: 0.2rem; }
+    [data-testid="stHorizontalBlock"]:has(.vs-divider) [data-testid="stWidgetLabel"] {
+        margin-bottom: 0.1rem;
+    }
+}
+
 /* ── tables ── */
 [data-testid="stTable"] {
     border: 1px solid #26305a;
@@ -750,8 +767,7 @@ if page == "Match Predictor":
         home_default = team_pool.index("Argentina") if "Argentina" in team_pool else 0
         home_team = st.selectbox("Home team", team_pool, index=home_default)
     with cmid:
-        st.markdown("<div style='text-align:center;padding-top:2rem;font-size:1.5rem'>vs</div>",
-                    unsafe_allow_html=True)
+        st.markdown("<div class='vs-divider'>vs</div>", unsafe_allow_html=True)
     with c2:
         away_default = team_pool.index("France") if "France" in team_pool else 1
         away_team = st.selectbox("Away team", team_pool, index=away_default)
