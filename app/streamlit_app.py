@@ -749,6 +749,25 @@ page = st.radio(
 )
 
 
+@st.cache_data(ttl=3600, show_spinner=False)
+def next_fixture_defaults() -> tuple[str, str]:
+    """
+    Default (home, away) for the Match Predictor = the next upcoming WC 2026
+    fixture (hourly-cached). Each team must be a valid WC participant; anything
+    unmatched falls back to a sensible default. Never raises.
+    """
+    fallback = ("Argentina", "France")
+    try:
+        fx = fetch_results.get_next_fixture()
+    except Exception:
+        fx = None
+    if not fx:
+        return fallback
+    home = fx.get("home") if fx.get("home") in WC_TEAMS else fallback[0]
+    away = fx.get("away") if fx.get("away") in WC_TEAMS else fallback[1]
+    return fallback if home == away else (home, away)
+
+
 # ══════════════════════════════════════════════════════════════════════════
 #  PAGE 1 — MATCH PREDICTOR
 # ══════════════════════════════════════════════════════════════════════════
@@ -762,15 +781,25 @@ if page == "Match Predictor":
     show_all = st.session_state.get("show_all_teams", False)
     team_pool = ALL_TEAMS if show_all else WC_TEAMS
 
+    # Default to the next real WC 2026 fixture. `index` only seeds the FIRST
+    # render — Streamlit persists the user's choice afterwards, so a manual
+    # change is never overridden on rerun.
+    def_home, def_away = next_fixture_defaults()
+
+    def _idx(pool: list[str], pref: str, fb: str, fb_i: int) -> int:
+        if pref in pool:
+            return pool.index(pref)
+        return pool.index(fb) if fb in pool else fb_i
+
     c1, cmid, c2 = st.columns([5, 1, 5])
     with c1:
-        home_default = team_pool.index("Argentina") if "Argentina" in team_pool else 0
-        home_team = st.selectbox("Home team", team_pool, index=home_default)
+        home_team = st.selectbox("Home team", team_pool,
+                                 index=_idx(team_pool, def_home, "Argentina", 0))
     with cmid:
         st.markdown("<div class='vs-divider'>vs</div>", unsafe_allow_html=True)
     with c2:
-        away_default = team_pool.index("France") if "France" in team_pool else 1
-        away_team = st.selectbox("Away team", team_pool, index=away_default)
+        away_team = st.selectbox("Away team", team_pool,
+                                 index=_idx(team_pool, def_away, "France", 1))
 
     st.checkbox(f"Show all {len(ALL_TEAMS)} teams", key="show_all_teams",
                 help="Off: only the 48 WC 2026 participants")
