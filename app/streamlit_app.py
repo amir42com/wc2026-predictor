@@ -1510,24 +1510,32 @@ else:
     st.markdown("---")
     st.subheader("Match-by-match")
 
+    # Categorical (not performance) colours for the bar: home / draw / away.
     OUTCOME_COLORS = ["#3b82f6", "#6b7280", "#f59e0b"]
 
     def _wdl_cell(m: dict) -> str:
         """
-        Each win/draw/loss % sits centered above its own bar segment, so the
-        number maps visually to the segment it describes (Task 7). Label boxes
-        and bar segments share identical flex widths (the segment's share).
+        The three pre-tournament probabilities (home / draw / away). The number
+        for the outcome that ACTUALLY happened is bold in normal text; the other
+        two are muted. In the bar, only the actual-outcome segment is full
+        strength; the others are dimmed. No performance colour-coding.
         """
-        probs = [m["p_home"], m["p_draw"], m["p_away"]]
-        pred  = m["predicted_outcome"]
+        probs  = [m["p_home"], m["p_draw"], m["p_away"]]
+        # Real outcome from the score, home team's perspective (0=win,1=draw,2=loss)
+        hs, as_ = m["home_score"], m["away_score"]
+        actual = 0 if hs > as_ else (1 if hs == as_ else 2)
+
         labels = "".join(
-            f'<div style="flex:0 0 {p*100:.4f}%;text-align:center;color:{c};'
-            f'font-size:0.7rem;font-weight:700;white-space:nowrap">{p*100:.0f}%</div>'
-            for p, c in zip(probs, OUTCOME_COLORS)
+            f'<div style="flex:0 0 {p*100:.4f}%;text-align:center;white-space:nowrap;'
+            f'font-size:0.72rem;'
+            + ("color:#e8ecf6;font-weight:700" if i == actual
+               else "color:#5b6379;font-weight:400")
+            + f'">{p*100:.0f}%</div>'
+            for i, p in enumerate(probs)
         )
         bar = "".join(
             f'<div style="flex:0 0 {p*100:.4f}%;background:{c};'
-            f'{"opacity:1" if i == pred else "opacity:0.45"}"></div>'
+            f'{"opacity:1" if i == actual else "opacity:0.4"}"></div>'
             for i, (p, c) in enumerate(zip(probs, OUTCOME_COLORS))
         )
         return (
@@ -1538,51 +1546,9 @@ else:
             f'</div>'
         )
 
-    # Heat scale for the probability the model gave the ACTUAL outcome.
-    # Anchored at ~33% (random across 3 outcomes): below trends amber→red,
-    # above trends green, deep green only past ~60%.
-    _HEAT_ANCHORS = [
-        (0.00, (176,  42,  42)),   # deep red
-        (0.20, (231,  76,  60)),   # red
-        (0.33, (245, 158,  11)),   # amber (≈ random baseline)
-        (0.50, (150, 196,  70)),   # yellow-green
-        (0.60, ( 46, 204, 113)),   # green
-        (1.00, ( 22, 128,  70)),   # deep green
-    ]
-
-    def _heat_rgb(p: float) -> tuple[int, int, int]:
-        if p <= _HEAT_ANCHORS[0][0]:
-            return _HEAT_ANCHORS[0][1]
-        if p >= _HEAT_ANCHORS[-1][0]:
-            return _HEAT_ANCHORS[-1][1]
-        for (p0, c0), (p1, c1) in zip(_HEAT_ANCHORS, _HEAT_ANCHORS[1:]):
-            if p0 <= p <= p1:
-                t = (p - p0) / (p1 - p0)
-                return tuple(int(round(c0[i] + t * (c1[i] - c0[i]))) for i in range(3))
-        return _HEAT_ANCHORS[-1][1]
-
-    def _lighten(rgb: tuple[int, int, int], t: float = 0.35) -> tuple[int, int, int]:
-        return tuple(int(round(c + t * (255 - c))) for c in rgb)
-
-    def _call_cell(m: dict) -> str:
-        """Gradient badge = P(actual outcome); subtle ✓/✗ = was top pick right."""
-        probs   = [m["p_home"], m["p_draw"], m["p_away"]]
-        p_act   = probs[m["actual_outcome"]]
-        r, g, b = _heat_rgb(p_act)
-        lr, lg, lb = _lighten((r, g, b))
-        mark     = "✓" if m["correct"] else "✗"
-        mark_col = "#7fd99a" if m["correct"] else "#e57373"
-        return (
-            f'<span style="display:inline-block;padding:2px 9px;border-radius:7px;'
-            f'background:rgba({r},{g},{b},0.18);border:1px solid rgba({r},{g},{b},0.5);'
-            f'color:rgb({lr},{lg},{lb});font-weight:700">{p_act*100:.0f}%</span> '
-            f'<span style="color:{mark_col};opacity:.7;font-size:.85rem" '
-            f'title="top pick {"correct" if m["correct"] else "wrong"}">{mark}</span>'
-        )
-
     rows = []
     for m in matches:
-        if m.get("correct") is None:
+        if m.get("p_home") is None:   # no model prediction for this match
             continue
         h, a = m["home_team"], m["away_team"]
         rows.append(
@@ -1592,22 +1558,18 @@ else:
             f'<b>{m["home_score"]}–{m["away_score"]}</b> '
             f'{short_name(a)} {flag_img(a)}</td>'
             f'<td>{_wdl_cell(m)}</td>'
-            f'<td>{_call_cell(m)}</td>'
             f'</tr>'
         )
 
     st.markdown(
         '<div class="html-table"><table><thead><tr>'
-        '<th>Date</th><th>Result</th><th>Win / Draw / Loss</th><th>Call</th>'
+        '<th>Date</th><th>Result</th><th>Win / Draw / Loss</th>'
         '</tr></thead><tbody>' + "".join(rows) + '</tbody></table></div>',
         unsafe_allow_html=True,
     )
     st.caption(
-        "**Win / Draw / Loss** lists the model's three probabilities; the thin "
-        "bar beneath shows them visually (home blue · draw gray · away amber), "
-        "solid segment = the model's pick. **Call** shows the probability the "
-        "model gave the *actual* result, colour-coded around a 33% midpoint "
-        "(one-in-three is random): green = the model saw it coming, amber ≈ a "
-        "coin-toss, red = caught out. The small ✓ / ✗ marks whether the top "
-        "pick was right."
+        "The three numbers are the model's pre-tournament **win / draw / loss** "
+        "probabilities; the thin bar beneath shows them visually (home blue · "
+        "draw gray · away amber). The **bold** number and the full-strength bar "
+        "segment mark the outcome that actually happened; the other two are dimmed."
     )
