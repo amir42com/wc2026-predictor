@@ -243,14 +243,13 @@ ALL_TEAMS = sorted(predictor._state.keys())
 # ── page icons (Tabler outline set; monochrome, accent-coloured) ────────────
 # Each page uses the same icon in its nav item and (on desktop) its hero.
 # Path data copied verbatim from @tabler/icons outline SVGs (all four verified
-# to exist: swords, trophy, list-numbers, target).
+# to exist: crystal-ball, trophy, list-numbers, radar).
 _ACCENT = "#4fc3f7"
 _TABLER_PATHS: dict[str, list[str]] = {
-    "swords": [
-        "M21 3v5l-11 9l-4 4l-3 -3l4 -4l9 -11l5 0",
-        "M5 13l6 6",
-        "M14.32 17.32l3.68 3.68l3 -3l-3.365 -3.365",
-        "M10 5.5l-2 -2.5h-5v5l3 2.5",
+    "crystal-ball": [
+        "M6.73 17.018a8 8 0 1 1 10.54 0",
+        "M5 19a2 2 0 0 0 2 2h10a2 2 0 1 0 0 -4h-10a2 2 0 0 0 -2 2",
+        "M11 7a3 3 0 0 0 -3 3",
     ],
     "trophy": [
         "M8 21l8 0", "M12 17l0 4", "M7 4l10 0",
@@ -263,10 +262,10 @@ _TABLER_PATHS: dict[str, list[str]] = {
         "M4 16a2 2 0 1 1 4 0c0 .591 -.5 1 -1 1.5l-3 2.5h4",
         "M6 10v-6l-2 2",
     ],
-    "target": [
-        "M11 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0",
-        "M7 12a5 5 0 1 0 10 0a5 5 0 1 0 -10 0",
-        "M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0",
+    "radar": [
+        "M21 12h-8a1 1 0 1 0 -1 1v8a9 9 0 0 0 9 -9",
+        "M16 9a5 5 0 1 0 -7 7",
+        "M20.486 9a9 9 0 1 0 -11.482 11.495",
     ],
 }
 
@@ -284,11 +283,11 @@ def _tabler_data_uri(name: str, stroke: str, size: int = 22) -> str:
 
 
 # Nav order must match the st.radio options; hero of each page reuses the same icon.
-NAV_ICON_ORDER = ["swords", "trophy", "list-numbers", "target"]
-HERO_PREDICT  = tabler_svg("swords")
+NAV_ICON_ORDER = ["crystal-ball", "trophy", "list-numbers", "radar"]
+HERO_PREDICT  = tabler_svg("crystal-ball")
 HERO_SIMULATE = tabler_svg("trophy")
 HERO_RANKINGS = tabler_svg("list-numbers")
-HERO_TRACKER  = tabler_svg("target")
+HERO_TRACKER  = tabler_svg("radar")
 
 
 # ── design system: "Midnight Pitch" ─────────────────────────────────────────
