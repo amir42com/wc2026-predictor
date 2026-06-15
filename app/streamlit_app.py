@@ -32,6 +32,16 @@ RAW_DIR       = Path(__file__).resolve().parents[1] / "data" / "raw"
 
 WC_TEAMS = sorted({t for teams in GROUPS.values() for t in teams})
 
+# ── Color / side invariant (single source of truth) ────────────────────────
+# Home / first-listed team is ALWAYS shown on the LEFT and in blue; the away /
+# second team is ALWAYS on the RIGHT and in amber; a draw is the grey middle.
+# These never flip with the matchup. Used by the result strip, the scorelines,
+# the team comparison and the reasons panel so the convention can't regress.
+HOME_COLOR = "#3b82f6"   # home / first-listed — left + blue
+DRAW_COLOR = "#6b7280"   # draw — grey middle
+AWAY_COLOR = "#f59e0b"   # away / second — right + amber
+OUTCOME_COLORS = [HOME_COLOR, DRAW_COLOR, AWAY_COLOR]   # [home, draw, away]
+
 CONF_COLOR = {
     "UEFA":     "#3498db",
     "CONMEBOL": "#2ecc71",
@@ -916,10 +926,9 @@ if page == "Match Predictor":
     outcome_labels  = [f"{home_team} Win", "Draw", f"{away_team} Win"]
 
     # ── probability display ────────────────────────────────────────────────
-    # Identity colors (home blue / draw gray / away amber), not good/bad
-    # semantics. HTML cards + bar so flag images render on every platform.
-    OUTCOME_COLORS = ["#3b82f6", "#6b7280", "#f59e0b"]
-
+    # Identity colours (home blue / draw grey / away amber) from the page-wide
+    # invariant (OUTCOME_COLORS), not good/bad semantics. HTML cards + strip so
+    # flag images render on every platform.
     st.markdown("---")
     card_labels = [
         f"{flag_img(home_team)} {home_team} Win",
@@ -953,9 +962,9 @@ if page == "Match Predictor":
         f'<div class="scl-row">'
         f'<span class="scl-rank">{i}</span>'
         f'<span class="scl-score">'
-        f'<span style="color:#3b82f6">{hg}</span>'
+        f'<span style="color:{HOME_COLOR}">{hg}</span>'
         f'<span style="color:#5b6379;margin:0 7px">–</span>'
-        f'<span style="color:#f59e0b">{ag}</span></span>'
+        f'<span style="color:{AWAY_COLOR}">{ag}</span></span>'
         f'<span class="scl-prob">{pr*100:.1f}%</span>'
         f'</div>'
         for i, ((hg, ag), pr) in enumerate(scl, start=1)
@@ -974,28 +983,30 @@ if page == "Match Predictor":
 
     # ── team comparison ────────────────────────────────────────────────────
     st.subheader("Team comparison")
-    comp_df = pd.DataFrame({
-        "": ["Elo rating", "Form — win rate (last 5)",
-             "Form — avg GD (last 5)", "Form — win rate (last 10)",
-             "Form — avg GD (last 10)", "Confederation"],
-        home_team: [
-            f"{hs['elo']:.0f}",
-            f"{hs['win_rate_5']*100:.0f}%",
-            f"{hs['gd_5']:+.2f}",
-            f"{hs['win_rate_10']*100:.0f}%",
-            f"{hs['gd_10']:+.2f}",
-            hs["confederation"],
-        ],
-        away_team: [
-            f"{as_['elo']:.0f}",
-            f"{as_['win_rate_5']*100:.0f}%",
-            f"{as_['gd_5']:+.2f}",
-            f"{as_['win_rate_10']*100:.0f}%",
-            f"{as_['gd_10']:+.2f}",
-            as_["confederation"],
-        ],
-    }).set_index("")
-    st.table(comp_df)
+    # Home (left) header tinted blue, away (right) header amber — same side /
+    # colour invariant as the result strip, scorelines and reasons panel.
+    comp_metrics = [
+        ("Elo rating",               f"{hs['elo']:.0f}",            f"{as_['elo']:.0f}"),
+        ("Form — win rate (last 5)", f"{hs['win_rate_5']*100:.0f}%", f"{as_['win_rate_5']*100:.0f}%"),
+        ("Form — avg GD (last 5)",   f"{hs['gd_5']:+.2f}",          f"{as_['gd_5']:+.2f}"),
+        ("Form — win rate (last 10)", f"{hs['win_rate_10']*100:.0f}%", f"{as_['win_rate_10']*100:.0f}%"),
+        ("Form — avg GD (last 10)",  f"{hs['gd_10']:+.2f}",         f"{as_['gd_10']:+.2f}"),
+        ("Confederation",            hs["confederation"],           as_["confederation"]),
+    ]
+    cmp_head = (
+        f'<tr><th></th>'
+        f'<th style="color:{HOME_COLOR}">{flag_img(home_team)} {home_team}</th>'
+        f'<th style="color:{AWAY_COLOR}">{flag_img(away_team)} {away_team}</th></tr>'
+    )
+    cmp_body = "".join(
+        f'<tr><td style="color:#93a1c8">{m}</td><td>{h}</td><td>{a}</td></tr>'
+        for m, h, a in comp_metrics
+    )
+    st.markdown(
+        f'<div class="html-table"><table><thead>{cmp_head}</thead>'
+        f'<tbody>{cmp_body}</tbody></table></div>',
+        unsafe_allow_html=True,
+    )
     st.caption(
         "**Elo rating** = team strength score built from 150 years of results "
         "(top teams ≈ 2000+). **Form** = results in the team's most recent "
@@ -1025,7 +1036,6 @@ if page == "Match Predictor":
     fav_is_home = proba[0] >= proba[2]
     fav_team = home_team if fav_is_home else away_team
     opp_team = away_team if fav_is_home else home_team
-    HOME_COLOR, AWAY_COLOR = OUTCOME_COLORS[0], OUTCOME_COLORS[2]
 
     st.subheader(f"Why is {fav_team} favoured?")
 
@@ -1576,8 +1586,9 @@ else:
 
     # Categorical (not performance) colours: bar segments and number tints.
     # Draw NUMBER uses a light grey (mid-grey reads as "disabled" on dark).
-    OUTCOME_COLORS = ["#3b82f6", "#6b7280", "#f59e0b"]   # bar: home / draw / away
-    NUMBER_COLORS  = ["#3b82f6", "#b4bdd1", "#f59e0b"]   # text: home / draw(light) / away
+    # Same home/draw/away invariant as the rest of the app (see OUTCOME_COLORS);
+    # NUMBER_COLORS only lightens the draw text so it reads on the dark bar.
+    NUMBER_COLORS = [HOME_COLOR, "#b4bdd1", AWAY_COLOR]  # text: home / draw(light) / away
 
     def _wdl_cell(m: dict) -> str:
         """
