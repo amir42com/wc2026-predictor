@@ -21,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from simulate import GROUPS, Predictor, monte_carlo, simulate_group, resolve_r32
 from train import ELO_BLEND_W, elo_prior_proba, make_X
 from scorelines import top_scorelines
+from explain import build_reasons
 import fetch_results
 
 RESULTS_PATH = Path(__file__).resolve().parents[1] / "data" / "wc2026_results.json"
@@ -1016,125 +1017,124 @@ if page == "Match Predictor":
             f"{home_team} {hw_n}W – {d_n}D – {aw_n}W {away_team}"
         )
 
-    # ── SHAP explanation ───────────────────────────────────────────────────
-    # Explain relative to the FAVOURED team's win class so positive bars
-    # always mean "pushes toward the favourite".
+    # ── Why is X favoured?  (plain-language reasons) ───────────────────────
+    # The model's SHAP contributions are grouped into a fixed set of reasons
+    # (see src/explain.py) and summed per group — SHAP is additive, so this
+    # loses nothing and still reconciles to the W/D/L shown above. SHAP is
+    # oriented to the HOME class, so a positive group sum favours the home
+    # team (blue) and a negative sum favours the away team (amber). The
+    # favourite (heading) is whoever has the higher win probability.
     fav_is_home = proba[0] >= proba[2]
-    fav_team  = home_team if fav_is_home else away_team
-    opp_team  = away_team if fav_is_home else home_team
-    fav_color = OUTCOME_COLORS[0] if fav_is_home else OUTCOME_COLORS[2]
-    opp_color = OUTCOME_COLORS[2] if fav_is_home else OUTCOME_COLORS[0]
-    fav_class = 0 if fav_is_home else 2
+    fav_team = home_team if fav_is_home else away_team
+    opp_team = away_team if fav_is_home else home_team
+    HOME_COLOR, AWAY_COLOR = OUTCOME_COLORS[0], OUTCOME_COLORS[2]
 
     st.subheader(f"Why is {fav_team} favoured?")
 
-    sv = explainer.shap_values(X)  # shape (n_samples, n_features, n_classes)
-    sv_series = pd.Series(sv[0, :, fav_class], index=bundle["feature_cols"])
-    xrow = X.iloc[0]
+    sv = explainer.shap_values(X)  # (n_samples, n_features, n_classes)
+    shap_home = dict(zip(bundle["feature_cols"], sv[0, :, 0]))   # HOME-oriented
+    feat_vals = dict(zip(bundle["feature_cols"], X.iloc[0].values))
+    ctx = {
+        "home_team": home_team, "away_team": away_team,
+        "home_conf": hs["confederation"], "away_conf": as_["confederation"],
+    }
+    reasons = build_reasons(shap_home, feat_vals, ctx, max_reasons=5)
 
-    def _side(f: str) -> str:
-        """Team a feature belongs to (home/away prefix), else the home team."""
-        return away_team if f.startswith(("away_", "a_conf_")) else home_team
-
-    def _value_label(f: str) -> str:
-        """Axis label: human name + the actual value, with team names."""
-        v = float(xrow[f])
-        if f == "elo_diff":
-            stronger = home_team if v > 0 else away_team
-            return f"Team strength gap: {stronger} +{abs(v):.0f} Elo"
-        if f in ("home_elo", "away_elo"):
-            return f"{_side(f)} strength: {v:.0f} Elo"
-        if "_win_rate_" in f:
-            return f"{_side(f)} win rate, last {f.rsplit('_', 1)[1]}: {v*100:.0f}%"
-        if "_gd_" in f:
-            return f"{_side(f)} goal diff, last {f.rsplit('_', 1)[1]}: {v:+.1f}"
-        if f == "h2h_n":
-            return f"Head-to-head games played: {v:.0f}"
-        if f == "h2h_home_wr":
-            return f"Head-to-head: {home_team} wins {v*100:.0f}%"
-        if f in ("home_conf_elo", "away_conf_elo"):
-            return f"{_side(f)} confederation strength: {v:.0f}"
-        if f == "neutral":
-            return f"Neutral venue: {'yes' if v else 'no'}"
-        if f == "is_world_cup":
-            return f"World Cup match: {'yes' if v else 'no'}"
-        if f.startswith(("h_conf_", "a_conf_")):
-            conf = f.split("_", 2)[2]
-            return f"{_side(f)}: {conf} team" + ("" if v else " (not)")
-        return FEATURE_LABELS.get(f, f)
-
-    def _fragment(f: str) -> str:
-        """Short phrase for the auto-generated summary sentence."""
-        v = float(xrow[f])
-        if f == "elo_diff":
-            stronger = home_team if v > 0 else away_team
-            return f"{stronger}'s +{abs(v):.0f} Elo advantage"
-        if f in ("home_elo", "away_elo"):
-            return f"{_side(f)}'s overall strength ({v:.0f} Elo)"
-        if "_win_rate_" in f:
-            return (f"{_side(f)}'s recent form "
-                    f"({v*100:.0f}% wins in the last {f.rsplit('_', 1)[1]})")
-        if "_gd_" in f:
-            return f"{_side(f)}'s recent goal difference ({v:+.1f} per game)"
-        if f in ("h2h_n", "h2h_home_wr"):
-            return "the head-to-head record"
-        if f in ("home_conf_elo", "away_conf_elo"):
-            owner = _side(f)
-            favours_fav = sv_series[f] > 0
-            adj = "strong" if (favours_fav == (owner == fav_team)) else "weaker"
-            return f"{owner}'s {adj} confederation"
-        if f == "neutral":
-            return "the neutral venue"
-        if f == "is_world_cup":
-            return "it being a World Cup match"
-        if f.startswith(("h_conf_", "a_conf_")):
-            conf = f.split("_", 2)[2]
-            return f"{_side(f)} being a {CONF_FULL.get(conf, conf)} side"
-        return FEATURE_LABELS.get(f, f).lower()
-
-    # Auto-generated summary from the top 3 contributors
-    top3 = sv_series.abs().nlargest(3).index
-    pos  = [f for f in top3 if sv_series[f] > 0]
-    neg  = [f for f in top3 if sv_series[f] < 0]
-    if pos:
-        summary = (f"{fav_team} is favoured mainly because of "
-                   + " and ".join(_fragment(f) for f in pos[:2]))
-        if neg:
-            summary += f"; {_fragment(neg[0])} narrows the gap"
+    # One-line lead: top reasons for the favourite, plus the biggest against.
+    favouring = [r for r in reasons if r["home_favoured"] == fav_is_home]
+    against   = [r for r in reasons if r["home_favoured"] != fav_is_home]
+    if favouring:
+        lead = (f"{fav_team} is favoured mainly on "
+                + " and ".join(r["headline"].lower() for r in favouring[:2]))
+        if against:
+            lead += f", though {against[0]['headline'].lower()} narrows the gap"
     else:
-        summary = f"{fav_team} is narrowly favoured despite {_fragment(neg[0])}"
-    st.markdown(f"**{summary}.**")
+        lead = f"{fav_team} is only narrowly favoured"
+    st.markdown(f"**{lead}.**")
 
     st.markdown(
-        f"<span style='color:{fav_color}'>&#9632;</span> favours {fav_team} "
-        f"&nbsp;·&nbsp; "
-        f"<span style='color:{opp_color}'>&#9632;</span> favours {opp_team}",
+        f"<span style='color:{HOME_COLOR}'>&#9632;</span> favours {home_team}"
+        f" &nbsp;·&nbsp; "
+        f"<span style='color:{AWAY_COLOR}'>&#9632;</span> favours {away_team}"
+        f" &nbsp;·&nbsp; <span style='opacity:.6'>hover / tap a row for the"
+        f" detailed breakdown</span>",
         unsafe_allow_html=True,
     )
 
-    # Top 8 factors + everything else aggregated into one bar
-    top8 = sv_series.abs().nlargest(8).index
-    rest_net = float(sv_series.drop(top8).sum())
-    shown = sv_series[top8].sort_values()  # ascending → biggest at top of chart
+    def _esc(s: str) -> str:
+        return (str(s).replace("&", "&amp;").replace("<", "&lt;")
+                .replace(">", "&gt;"))
 
-    y_labels = ["All other factors (net)"] + [_value_label(f) for f in shown.index]
-    x_vals   = [rest_net] + list(shown.values)
-    colors   = [fav_color if v > 0 else opp_color for v in x_vals]
+    rows_html = []
+    for r in reasons:
+        home_fav = r["home_favoured"]
+        color = HOME_COLOR if home_fav else AWAY_COLOR
+        sign  = "+" if home_fav else "−"          # plus / minus
+        pct   = max(4.0, r["magnitude"] * 100.0)       # bar fill, min visible
+        fill_l = f"{pct:.0f}" if not home_fav else "0"
+        fill_r = f"{pct:.0f}" if home_fav else "0"
 
-    fig_shap = go.Figure(go.Bar(
-        x=x_vals,
-        y=y_labels,
-        orientation="h",
-        marker_color=colors,
-        hovertemplate="%{y}: %{x:.4f}<extra></extra>",
-    ))
-    fig_shap.update_layout(
-        xaxis_title=f"← favours {opp_team}      favours {fav_team} →",
-        height=400,
-        margin=dict(l=10, r=20, t=20, b=40),
-        yaxis=dict(automargin=True),
+        detail_rows = []
+        for label, val in r["detail"]:
+            dcolor = HOME_COLOR if val > 0 else AWAY_COLOR
+            detail_rows.append(
+                f"<div class='wcr-drow'><span>{_esc(label)}</span>"
+                f"<span style='color:{dcolor}'>{val:+.3f}</span></div>"
+            )
+        detail_html = (
+            "<div class='wcr-detail'><div class='wcr-dhead'>Behind this group "
+            "(raw model factors and their contributions):</div>"
+            + "".join(detail_rows) + "</div>"
+        ) if detail_rows else ""
+
+        rows_html.append(
+            f"<div class='wcr-row' tabindex='0'>"
+            f"<div class='wcr-badge' style='background:{color}'>{sign}</div>"
+            f"<div class='wcr-body'>"
+            f"<div class='wcr-head'>{_esc(r['headline'])}"
+            f"<span class='wcr-info'>&#9432;</span></div>"
+            f"<div class='wcr-desc'>{_esc(r['description'])}</div>"
+            f"<div class='wcr-track'>"
+            f"<div class='wcr-half wcr-left'>"
+            f"<div class='wcr-fill' style='width:{fill_l}%;background:{AWAY_COLOR}'></div></div>"
+            f"<div class='wcr-mid'></div>"
+            f"<div class='wcr-half wcr-right'>"
+            f"<div class='wcr-fill' style='width:{fill_r}%;background:{HOME_COLOR}'></div></div>"
+            f"</div>{detail_html}</div></div>"
+        )
+
+    panel_css = """
+    <style>
+    .wcr-panel{display:flex;flex-direction:column;gap:10px;margin-top:6px;}
+    .wcr-row{display:flex;gap:12px;padding:12px 14px;border-radius:10px;
+        background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);
+        outline:none;transition:background .15s;}
+    .wcr-row:hover,.wcr-row:focus-within{background:rgba(255,255,255,0.08);}
+    .wcr-badge{flex:0 0 28px;height:28px;border-radius:50%;color:#fff;
+        font-weight:700;font-size:1.05rem;display:flex;align-items:center;
+        justify-content:center;margin-top:2px;}
+    .wcr-body{flex:1;min-width:0;}
+    .wcr-head{font-weight:700;font-size:1.0rem;display:flex;align-items:center;gap:6px;}
+    .wcr-info{opacity:.45;font-size:.85rem;}
+    .wcr-desc{font-size:.9rem;opacity:.85;margin-top:2px;}
+    .wcr-track{display:flex;align-items:center;height:14px;margin-top:8px;}
+    .wcr-half{flex:1;display:flex;height:7px;}
+    .wcr-left{justify-content:flex-end;}
+    .wcr-right{justify-content:flex-start;}
+    .wcr-fill{height:7px;border-radius:4px;min-width:0;}
+    .wcr-mid{width:2px;height:14px;background:#9ca3af;flex:0 0 2px;}
+    .wcr-detail{display:none;margin-top:10px;padding:8px 10px;border-radius:8px;
+        background:rgba(0,0,0,0.25);font-size:.82rem;}
+    .wcr-row:hover .wcr-detail,.wcr-row:focus-within .wcr-detail{display:block;}
+    .wcr-dhead{opacity:.6;margin-bottom:4px;}
+    .wcr-drow{display:flex;justify-content:space-between;gap:12px;
+        padding:2px 0;font-variant-numeric:tabular-nums;}
+    </style>
+    """
+    st.markdown(
+        panel_css + "<div class='wcr-panel'>" + "".join(rows_html) + "</div>",
+        unsafe_allow_html=True,
     )
-    st.plotly_chart(fig_shap, use_container_width=True, config=_PLOTLY_CONFIG)
 
 
 # ══════════════════════════════════════════════════════════════════════════
