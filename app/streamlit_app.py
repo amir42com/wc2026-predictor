@@ -282,8 +282,9 @@ def _tabler_data_uri(name: str, stroke: str, size: int = 22) -> str:
     return "data:image/svg+xml," + urllib.parse.quote(tabler_svg(name, stroke=stroke, size=size))
 
 
-# Nav order must match the st.radio options; hero of each page reuses the same icon.
-NAV_ICON_ORDER = ["crystal-ball", "trophy", "list-numbers", "radar"]
+# Nav order must match the st.radio options: Predict, Tracker, Simulate, Rankings.
+# Hero of each page reuses the same icon (HERO_* constants below).
+NAV_ICON_ORDER = ["crystal-ball", "radar", "trophy", "list-numbers"]
 HERO_PREDICT  = tabler_svg("crystal-ball")
 HERO_SIMULATE = tabler_svg("trophy")
 HERO_RANKINGS = tabler_svg("list-numbers")
@@ -512,9 +513,9 @@ h1, h2, h3 {
         font-size: 0.7rem; line-height: 1; color: #93a1c8; font-weight: 600;
     }
     [data-testid="stMain"] [data-testid="stRadio"] [role="radiogroup"] > label:nth-of-type(1)::after  { content: "Predict"; }
-    [data-testid="stMain"] [data-testid="stRadio"] [role="radiogroup"] > label:nth-of-type(2)::after  { content: "Simulate"; }
-    [data-testid="stMain"] [data-testid="stRadio"] [role="radiogroup"] > label:nth-of-type(3)::after  { content: "Rankings"; }
-    [data-testid="stMain"] [data-testid="stRadio"] [role="radiogroup"] > label:nth-of-type(4)::after  { content: "Tracker"; }
+    [data-testid="stMain"] [data-testid="stRadio"] [role="radiogroup"] > label:nth-of-type(2)::after  { content: "Tracker"; }
+    [data-testid="stMain"] [data-testid="stRadio"] [role="radiogroup"] > label:nth-of-type(3)::after  { content: "Simulate"; }
+    [data-testid="stMain"] [data-testid="stRadio"] [role="radiogroup"] > label:nth-of-type(4)::after  { content: "Rankings"; }
     /* active highlight (no pill; tint + accent label) */
     [data-testid="stMain"] [data-testid="stRadio"] [role="radiogroup"] > label:has(input:checked) {
         background: rgba(79, 195, 247, 0.12);
@@ -782,7 +783,7 @@ st.sidebar.markdown(f"""
 
 page = st.radio(
     "Navigate",
-    ["Match Predictor", "Tournament Simulator", "Team Rankings", "Prediction Tracker"],
+    ["Match Predictor", "Prediction Tracker", "Tournament Simulator", "Team Rankings"],
     horizontal=True,
     label_visibility="collapsed",
 )
