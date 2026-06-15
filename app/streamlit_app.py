@@ -20,6 +20,7 @@ import streamlit as st
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from simulate import GROUPS, Predictor, monte_carlo, simulate_group, resolve_r32
 from train import ELO_BLEND_W, elo_prior_proba, make_X
+from scorelines import top_scorelines
 import fetch_results
 
 RESULTS_PATH = Path(__file__).resolve().parents[1] / "data" / "wc2026_results.json"
@@ -363,6 +364,28 @@ h1, h2, h3 {
 .prob-bar .seg {
     display: flex; align-items: center; justify-content: center;
     gap: 6px; white-space: nowrap; overflow: hidden;
+}
+
+/* ── Most Likely Scorelines panel ── */
+.scl-panel { display: flex; flex-direction: column; gap: 6px; margin: 0.2rem 0 0.2rem; }
+.scl-row {
+    display: flex; align-items: center; gap: 12px;
+    background: linear-gradient(160deg, #151d3b 0%, #10162e 100%);
+    border: 1px solid #26305a; border-radius: 10px; padding: 8px 14px;
+}
+.scl-rank {
+    flex: 0 0 auto; width: 22px; height: 22px; border-radius: 50%;
+    border: 1px solid #4fc3f7; color: #4fc3f7;
+    font-size: 0.72rem; font-weight: 700;
+    display: inline-flex; align-items: center; justify-content: center;
+}
+.scl-score {
+    font-family: 'Sora', sans-serif; font-size: 1.05rem; font-weight: 700;
+    letter-spacing: 0.03em; white-space: nowrap;
+}
+.scl-prob {
+    margin-left: auto; color: #cdd6ee; font-weight: 600;
+    font-variant-numeric: tabular-nums;
 }
 
 /* ── HTML tables (flag images need unescaped HTML) ── */
@@ -923,6 +946,32 @@ if page == "Match Predictor":
         for p, c, t in zip(proba, OUTCOME_COLORS, seg_texts)
     )
     st.markdown(f'<div class="prob-bar">{segs}</div>', unsafe_allow_html=True)
+
+    # ── most likely scorelines (additive layer; rolls up to the W/D/L above) ─
+    st.subheader("Most Likely Scorelines")
+    scl = top_scorelines(proba[0], proba[1], proba[2], top_n=5)
+    scl_rows = "".join(
+        f'<div class="scl-row">'
+        f'<span class="scl-rank">{i}</span>'
+        f'<span class="scl-score">'
+        f'<span style="color:#3b82f6">{hg}</span>'
+        f'<span style="color:#5b6379;margin:0 7px">–</span>'
+        f'<span style="color:#f59e0b">{ag}</span></span>'
+        f'<span class="scl-prob">{pr*100:.1f}%</span>'
+        f'</div>'
+        for i, ((hg, ag), pr) in enumerate(scl, start=1)
+    )
+    st.markdown(
+        f'<div style="font-size:0.82rem;color:#93a1c8;margin-bottom:6px">'
+        f'{flag_img(home_team)} {short_name(home_team)} (home) – '
+        f'{short_name(away_team)} {flag_img(away_team)} (away)</div>'
+        f'<div class="scl-panel">{scl_rows}</div>',
+        unsafe_allow_html=True,
+    )
+    st.caption(
+        "For entertainment only. Match outcome probabilities are generally more "
+        "reliable than exact score predictions."
+    )
 
     # ── team comparison ────────────────────────────────────────────────────
     st.subheader("Team comparison")
