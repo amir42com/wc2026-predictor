@@ -355,17 +355,16 @@ h1, h2, h3 {
 }
 .prob-card img { vertical-align: -1px; margin-right: 5px; }
 
-/* ── HTML stacked probability bar ── */
-.prob-bar {
-    display: flex; height: 46px;
-    border-radius: 10px; overflow: hidden;
-    margin: 0.4rem 0 1rem 0;
-    font-size: 0.9rem; font-weight: 600; color: #fff;
+/* ── result unit: three cards + a thin proportional base strip ── */
+.prob-unit { margin: 0.2rem 0 1.1rem 0; }
+.prob-cards { display: flex; gap: 0.6rem; align-items: stretch; }
+.prob-cards > .prob-card { flex: 1; margin-bottom: 0; }
+.prob-strip {
+    display: flex; height: 8px; margin-top: 5px;
+    border-radius: 0 0 8px 8px; overflow: hidden;
 }
-.prob-bar .seg {
-    display: flex; align-items: center; justify-content: center;
-    gap: 6px; white-space: nowrap; overflow: hidden;
-}
+.prob-strip > div { height: 100%; }
+@media (max-width: 768px) { .prob-cards { flex-direction: column; } }
 
 /* ── Most Likely Scorelines panel ── */
 .scl-panel { display: flex; flex-direction: column; gap: 6px; margin: 0.2rem 0 0.2rem; }
@@ -927,26 +926,25 @@ if page == "Match Predictor":
         "Draw",
         f"{flag_img(away_team)} {away_team} Win",
     ]
-    mcols = st.columns(3)
-    for col, label, p, color in zip(mcols, card_labels, proba, OUTCOME_COLORS):
-        col.markdown(
-            f'<div class="prob-card" style="border-left:4px solid {color}">'
-            f'<div class="prob-label">{label}</div>'
-            f'<div class="prob-value">{p*100:.1f}%</div></div>',
-            unsafe_allow_html=True,
-        )
-
-    # Stacked probability bar — pure HTML so flags render and touch scrolling works
-    seg_texts = [
-        f"{flag_img(home_team)} {proba[0]*100:.1f}%",
-        f"{proba[1]*100:.1f}%",
-        f"{flag_img(away_team)} {proba[2]*100:.1f}%",
-    ]
-    segs = "".join(
-        f'<div class="seg" style="width:{p*100:.2f}%;background:{c}">{t}</div>'
-        for p, c, t in zip(proba, OUTCOME_COLORS, seg_texts)
+    cards = "".join(
+        f'<div class="prob-card" style="border-left:4px solid {color}">'
+        f'<div class="prob-label">{label}</div>'
+        f'<div class="prob-value">{p*100:.1f}%</div></div>'
+        for label, p, color in zip(card_labels, proba, OUTCOME_COLORS)
     )
-    st.markdown(f'<div class="prob-bar">{segs}</div>', unsafe_allow_html=True)
+    # A single thin proportional strip (no text) attached to the bottom of the
+    # three-card row: home blue · draw grey · away amber. The percentages are
+    # shown only once (in the cards); the strip just visualises the split, so
+    # the cards and strip read as one unit.
+    strip = "".join(
+        f'<div style="width:{p*100:.2f}%;background:{c}"></div>'
+        for p, c in zip(proba, OUTCOME_COLORS)
+    )
+    st.markdown(
+        f'<div class="prob-unit"><div class="prob-cards">{cards}</div>'
+        f'<div class="prob-strip">{strip}</div></div>',
+        unsafe_allow_html=True,
+    )
 
     # ── most likely scorelines (additive layer; rolls up to the W/D/L above) ─
     st.subheader("Most Likely Scorelines")
