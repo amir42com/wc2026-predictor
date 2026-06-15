@@ -370,8 +370,8 @@ h1, h2, h3 {
 .prob-cards { display: flex; gap: 0.6rem; align-items: stretch; }
 .prob-cards > .prob-card { flex: 1; margin-bottom: 0; }
 .prob-strip {
-    display: flex; height: 8px; margin-top: 5px;
-    border-radius: 0 0 8px 8px; overflow: hidden;
+    display: flex; height: 10px; margin-top: 8px;
+    border-radius: 5px; overflow: hidden;   /* symmetric pill — not tucked/clipped */
 }
 .prob-strip > div { height: 100%; }
 @media (max-width: 768px) { .prob-cards { flex-direction: column; } }
@@ -935,11 +935,14 @@ if page == "Match Predictor":
         "Draw",
         f"{flag_img(away_team)} {away_team} Win",
     ]
+    # Outcome labels follow the home-blue / away-amber invariant (draw stays a
+    # neutral grey); the big % numbers keep their high-contrast near-white.
+    label_colors = [HOME_COLOR, "#93a1c8", AWAY_COLOR]
     cards = "".join(
         f'<div class="prob-card" style="border-left:4px solid {color}">'
-        f'<div class="prob-label">{label}</div>'
+        f'<div class="prob-label" style="color:{lc}">{label}</div>'
         f'<div class="prob-value">{p*100:.1f}%</div></div>'
-        for label, p, color in zip(card_labels, proba, OUTCOME_COLORS)
+        for label, p, color, lc in zip(card_labels, proba, OUTCOME_COLORS, label_colors)
     )
     # A single thin proportional strip (no text) attached to the bottom of the
     # three-card row: home blue · draw grey · away amber. The percentages are
