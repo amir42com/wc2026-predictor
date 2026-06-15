@@ -1570,7 +1570,7 @@ else:
 
     st.markdown(
         '<div class="html-table"><table><thead><tr>'
-        '<th>Date</th><th>Result</th><th>Win / Draw / Loss</th>'
+        '<th>Date</th><th>Result</th><th>Prediction vs reality</th>'
         '</tr></thead><tbody>' + "".join(rows) + '</tbody></table></div>',
         unsafe_allow_html=True,
     )
