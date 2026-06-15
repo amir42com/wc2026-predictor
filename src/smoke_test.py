@@ -84,6 +84,22 @@ def main() -> int:
             assert len(tops) == 3 and all(0 <= pr <= 1 for _, pr in tops)
         print("(rollup <=1.5pp, grid sums to 1) ", end="")
 
+    def scoreline_logging():
+        # Pre-match scorelines recorded for the Tracker are a deterministic
+        # function of the W/D/L only (never the result): top-5, home-away,
+        # sorted high->low, and reproducible from the same probabilities.
+        from fetch_results import scorelines_for_proba
+
+        p = tuple(predictor["p"].predict("Argentina", "France"))
+        sl = scorelines_for_proba(*p, top_n=5)
+        assert len(sl) == 5, f"expected 5 scorelines, got {len(sl)}"
+        assert all(isinstance(h, int) and isinstance(a, int) and 0 < pr <= 1
+                   for h, a, pr in sl), f"bad scoreline entry in {sl}"
+        probs = [pr for *_, pr in sl]
+        assert probs == sorted(probs, reverse=True), "scorelines not sorted desc"
+        assert scorelines_for_proba(*p, top_n=5) == sl, "scorelines not deterministic"
+        print(f"(top-5 home-away, sorted, deterministic; #1 {sl[0][0]}-{sl[0][1]}) ", end="")
+
     def grouping_reconciliation():
         # The plain-language reasons SUM raw SHAP per group. Grouping must lose
         # nothing (group sums == total SHAP) and the SHAP must stay additive to
@@ -136,6 +152,7 @@ def main() -> int:
         ("build Predictor",          load_predictor),
         ("predict Argentina-France", predict_fixture),
         ("scoreline consistency",    scoreline_consistency),
+        ("pre-match scoreline log",  scoreline_logging),
         ("SHAP grouping reconcile",  grouping_reconciliation),
         ("100-sim Monte Carlo",      run_monte_carlo),
     ]
