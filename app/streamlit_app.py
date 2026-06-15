@@ -1510,38 +1510,45 @@ else:
     st.markdown("---")
     st.subheader("Match-by-match")
 
-    # Categorical (not performance) colours for the bar: home / draw / away.
-    OUTCOME_COLORS = ["#3b82f6", "#6b7280", "#f59e0b"]
+    # Categorical (not performance) colours: bar segments and number tints.
+    # Draw NUMBER uses a light grey (mid-grey reads as "disabled" on dark).
+    OUTCOME_COLORS = ["#3b82f6", "#6b7280", "#f59e0b"]   # bar: home / draw / away
+    NUMBER_COLORS  = ["#3b82f6", "#b4bdd1", "#f59e0b"]   # text: home / draw(light) / away
 
     def _wdl_cell(m: dict) -> str:
         """
-        The three pre-tournament probabilities (home / draw / away). The number
-        for the outcome that ACTUALLY happened is bold in normal text; the other
-        two are muted. In the bar, only the actual-outcome segment is full
-        strength; the others are dimmed. No performance colour-coding.
+        Three pre-tournament probabilities (home/draw/away), each tinted to its
+        zone (home blue · draw light-grey · away amber). Numbers sit in fixed
+        thirds above the bar — home left, draw centre, away right. The outcome
+        that ACTUALLY happened is larger + bold at full strength; the other two
+        are smaller and dimmed. In the (thicker) bar, the live segment is full
+        opacity with a faint inner highlight; the others are dimmed. No
+        performance colour-coding.
         """
-        probs  = [m["p_home"], m["p_draw"], m["p_away"]]
-        # Real outcome from the score, home team's perspective (0=win,1=draw,2=loss)
+        probs   = [m["p_home"], m["p_draw"], m["p_away"]]
         hs, as_ = m["home_score"], m["away_score"]
-        actual = 0 if hs > as_ else (1 if hs == as_ else 2)
+        actual  = 0 if hs > as_ else (1 if hs == as_ else 2)   # home perspective
+        aligns  = ["left", "center", "right"]
 
         labels = "".join(
-            f'<div style="flex:0 0 {p*100:.4f}%;text-align:center;white-space:nowrap;'
-            f'font-size:0.72rem;'
-            + ("color:#e8ecf6;font-weight:700" if i == actual
-               else "color:#5b6379;font-weight:400")
+            f'<div style="flex:1 1 0;text-align:{aligns[i]};white-space:nowrap;'
+            f'color:{NUMBER_COLORS[i]};'
+            + ("font-size:16px;font-weight:700;opacity:1" if i == actual
+               else "font-size:13px;font-weight:400;opacity:0.5")
             + f'">{p*100:.0f}%</div>'
             for i, p in enumerate(probs)
         )
         bar = "".join(
             f'<div style="flex:0 0 {p*100:.4f}%;background:{c};'
-            f'{"opacity:1" if i == actual else "opacity:0.4"}"></div>'
+            + ("opacity:1;box-shadow:inset 0 1.5px 0 rgba(255,255,255,0.4)"
+               if i == actual else "opacity:0.3")
+            + '"></div>'
             for i, (p, c) in enumerate(zip(probs, OUTCOME_COLORS))
         )
         return (
             f'<div style="min-width:150px">'
-            f'<div style="display:flex;margin-bottom:3px">{labels}</div>'
-            f'<div style="display:flex;height:9px;border-radius:4px;overflow:hidden">'
+            f'<div style="display:flex;align-items:flex-end;margin-bottom:4px">{labels}</div>'
+            f'<div style="display:flex;height:13px;border-radius:5px;overflow:hidden">'
             f'{bar}</div>'
             f'</div>'
         )
@@ -1569,7 +1576,7 @@ else:
     )
     st.caption(
         "The three numbers are the model's pre-tournament **win / draw / loss** "
-        "probabilities; the thin bar beneath shows them visually (home blue · "
-        "draw gray · away amber). The **bold** number and the full-strength bar "
-        "segment mark the outcome that actually happened; the other two are dimmed."
+        "probabilities, tinted to their zone (home blue · draw grey · away amber). "
+        "The larger **bold** number and the highlighted full-strength bar segment "
+        "mark the outcome that actually happened; the other two are dimmed."
     )
