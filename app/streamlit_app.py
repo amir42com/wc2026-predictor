@@ -974,8 +974,8 @@ if page == "Match Predictor":
     )
     st.markdown(
         f'<div style="font-size:0.82rem;color:#93a1c8;margin-bottom:6px">'
-        f'{flag_img(home_team)} {short_name(home_team)} (home) – '
-        f'{short_name(away_team)} {flag_img(away_team)} (away)</div>'
+        f'{flag_img(home_team)} <span style="color:{HOME_COLOR}">{short_name(home_team)}</span> – '
+        f'<span style="color:{AWAY_COLOR}">{short_name(away_team)}</span> {flag_img(away_team)}</div>'
         f'<div class="scl-panel">{scl_rows}</div>',
         unsafe_allow_html=True,
     )
