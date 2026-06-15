@@ -1071,8 +1071,10 @@ if page == "Match Predictor":
         color = HOME_COLOR if home_fav else AWAY_COLOR
         sign  = "+" if home_fav else "−"          # plus / minus
         pct   = max(4.0, r["magnitude"] * 100.0)       # bar fill, min visible
-        fill_l = f"{pct:.0f}" if not home_fav else "0"
-        fill_r = f"{pct:.0f}" if home_fav else "0"
+        # Side invariant: home (blue) extends LEFT, away (amber) extends RIGHT,
+        # matching the result strip / scorelines / comparison table.
+        fill_l = f"{pct:.0f}" if home_fav else "0"
+        fill_r = f"{pct:.0f}" if not home_fav else "0"
 
         detail_rows = []
         for label, val in r["detail"]:
@@ -1096,10 +1098,10 @@ if page == "Match Predictor":
             f"<div class='wcr-desc'>{_esc(r['description'])}</div>"
             f"<div class='wcr-track'>"
             f"<div class='wcr-half wcr-left'>"
-            f"<div class='wcr-fill' style='width:{fill_l}%;background:{AWAY_COLOR}'></div></div>"
+            f"<div class='wcr-fill' style='width:{fill_l}%;background:{HOME_COLOR}'></div></div>"
             f"<div class='wcr-mid'></div>"
             f"<div class='wcr-half wcr-right'>"
-            f"<div class='wcr-fill' style='width:{fill_r}%;background:{HOME_COLOR}'></div></div>"
+            f"<div class='wcr-fill' style='width:{fill_r}%;background:{AWAY_COLOR}'></div></div>"
             f"</div>{detail_html}</div></div>"
         )
 
