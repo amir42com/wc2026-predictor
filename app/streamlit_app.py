@@ -1068,8 +1068,7 @@ if page == "Match Predictor":
     rows_html = []
     for r in reasons:
         home_fav = r["home_favoured"]
-        color = HOME_COLOR if home_fav else AWAY_COLOR
-        sign  = "+" if home_fav else "−"          # plus / minus
+        color = HOME_COLOR if home_fav else AWAY_COLOR   # dot: blue home / amber away
         pct   = max(4.0, r["magnitude"] * 100.0)       # bar fill, min visible
         # Side invariant: home (blue) extends LEFT, away (amber) extends RIGHT,
         # matching the result strip / scorelines / comparison table.
@@ -1091,7 +1090,7 @@ if page == "Match Predictor":
 
         rows_html.append(
             f"<div class='wcr-row' tabindex='0'>"
-            f"<div class='wcr-badge' style='background:{color}'>{sign}</div>"
+            f"<span class='wcr-dot' style='background:{color}'></span>"
             f"<div class='wcr-body'>"
             f"<div class='wcr-head'>{_esc(r['headline'])}"
             f"<span class='wcr-info'>&#9432;</span></div>"
@@ -1112,9 +1111,7 @@ if page == "Match Predictor":
         background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);
         outline:none;transition:background .15s;}
     .wcr-row:hover,.wcr-row:focus-within{background:rgba(255,255,255,0.08);}
-    .wcr-badge{flex:0 0 28px;height:28px;border-radius:50%;color:#fff;
-        font-weight:700;font-size:1.05rem;display:flex;align-items:center;
-        justify-content:center;margin-top:2px;}
+    .wcr-dot{flex:0 0 10px;width:10px;height:10px;border-radius:50%;margin-top:7px;}
     .wcr-body{flex:1;min-width:0;}
     .wcr-head{font-weight:700;font-size:1.0rem;display:flex;align-items:center;gap:6px;}
     .wcr-info{opacity:.45;font-size:.85rem;}
