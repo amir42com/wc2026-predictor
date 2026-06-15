@@ -17,6 +17,7 @@ import joblib
 import numpy as np
 
 from simulate import GROUPS, Predictor, monte_carlo
+from scorelines import grid_wdl, scoreline_grid, top_scorelines
 
 PROCESSED_DIR = Path(__file__).resolve().parents[1] / "data" / "processed"
 MODELS_DIR    = Path(__file__).resolve().parents[1] / "models"
@@ -64,10 +65,29 @@ def main() -> int:
         top, cnt = wins.most_common(1)[0]
         print(f"(top: {top} {cnt}/100) ", end="")
 
+    def scoreline_consistency():
+        # Scoreline grid must sum to ~1 and roll up to the SAME W/D/L (<=1.5pp).
+        cases = [
+            tuple(predictor["p"].predict("Argentina", "France")),  # real fixture
+            (0.86, 0.10, 0.04),   # lopsided home favourite
+            (0.061, 0.162, 0.777),  # away favourite
+            (0.34, 0.33, 0.33),   # near coin-flip
+        ]
+        for p_home, p_draw, p_away in cases:
+            grid, _ = scoreline_grid(p_home, p_draw, p_away)
+            assert abs(grid.sum() - 1.0) < 1e-6, f"grid sums to {grid.sum()}"
+            iw, idr, ial = grid_wdl(grid)
+            gap = max(abs(iw - p_home), abs(idr - p_draw), abs(ial - p_away))
+            assert gap <= 0.015, f"W/D/L rollup off by {gap*100:.2f}pp for {(p_home,p_draw,p_away)}"
+            tops = top_scorelines(p_home, p_draw, p_away, top_n=3)
+            assert len(tops) == 3 and all(0 <= pr <= 1 for _, pr in tops)
+        print("(rollup <=1.5pp, grid sums to 1) ", end="")
+
     steps = [
         ("load model bundle",        load_bundle),
         ("build Predictor",          load_predictor),
         ("predict Argentina-France", predict_fixture),
+        ("scoreline consistency",    scoreline_consistency),
         ("100-sim Monte Carlo",      run_monte_carlo),
     ]
 
