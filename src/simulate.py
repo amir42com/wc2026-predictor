@@ -152,7 +152,8 @@ class Predictor:
         )
         return n, hw / n
 
-    def _raw_proba(self, home: str, away: str) -> np.ndarray:
+    def feature_X(self, home: str, away: str) -> pd.DataFrame:
+        """Model-ready feature matrix for a single home-away fixture (one row)."""
         hs  = self._state.get(home, self._default_state())
         as_ = self._state.get(away, self._default_state())
         n_h2h, hwr = self._h2h_stats(home, away)
@@ -178,7 +179,10 @@ class Predictor:
             "away_confederation":  as_["confederation"],
         }
         X, _ = make_X(pd.DataFrame([row]), self._feature_cols)
-        return self._model.predict_proba(X)[0]
+        return X
+
+    def _raw_proba(self, home: str, away: str) -> np.ndarray:
+        return self._model.predict_proba(self.feature_X(home, away))[0]
 
     def predict(self, team_a: str, team_b: str) -> np.ndarray:
         """
