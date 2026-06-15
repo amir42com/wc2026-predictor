@@ -1056,8 +1056,8 @@ if page == "Match Predictor":
         f"<span style='color:{HOME_COLOR}'>&#9632;</span> favours {home_team}"
         f" &nbsp;·&nbsp; "
         f"<span style='color:{AWAY_COLOR}'>&#9632;</span> favours {away_team}"
-        f" &nbsp;·&nbsp; <span style='opacity:.6'>hover / tap a row for the"
-        f" detailed breakdown</span>",
+        f" &nbsp;·&nbsp; <span style='opacity:.6'>click / tap a row to expand"
+        f" its detailed breakdown</span>",
         unsafe_allow_html=True,
     )
 
@@ -1065,8 +1065,19 @@ if page == "Match Predictor":
         return (str(s).replace("&", "&amp;").replace("<", "&lt;")
                 .replace(">", "&gt;"))
 
+    # Each reason is a native <details> accordion: click / tap / keyboard
+    # (Enter or Space) toggles it, and the browser exposes the open/closed
+    # state to assistive tech. No JavaScript (Streamlit strips <script>). The
+    # dot, headline, description and magnitude bar live in <summary> so they
+    # stay visible at all times; only the raw-factor breakdown sits behind the
+    # toggle. The top (largest) reason opens by default as an expand hint.
+    _CHEVRON = (
+        "<svg class='wcr-chev' viewBox='0 0 24 24' fill='none' "
+        "stroke='currentColor' stroke-width='2' stroke-linecap='round' "
+        "stroke-linejoin='round'><path d='M6 9l6 6l6 -6'/></svg>"
+    )
     rows_html = []
-    for r in reasons:
+    for i, r in enumerate(reasons):
         home_fav = r["home_favoured"]
         color = HOME_COLOR if home_fav else AWAY_COLOR   # dot: blue home / amber away
         pct   = max(4.0, r["magnitude"] * 100.0)       # bar fill, min visible
@@ -1089,11 +1100,11 @@ if page == "Match Predictor":
         ) if detail_rows else ""
 
         rows_html.append(
-            f"<div class='wcr-row' tabindex='0'>"
+            f"<details class='wcr-row'{' open' if i == 0 else ''}>"
+            f"<summary class='wcr-summary'>"
             f"<span class='wcr-dot' style='background:{color}'></span>"
             f"<div class='wcr-body'>"
-            f"<div class='wcr-head'>{_esc(r['headline'])}"
-            f"<span class='wcr-info'>&#9432;</span></div>"
+            f"<div class='wcr-head'>{_esc(r['headline'])}</div>"
             f"<div class='wcr-desc'>{_esc(r['description'])}</div>"
             f"<div class='wcr-track'>"
             f"<div class='wcr-half wcr-left'>"
@@ -1101,20 +1112,24 @@ if page == "Match Predictor":
             f"<div class='wcr-mid'></div>"
             f"<div class='wcr-half wcr-right'>"
             f"<div class='wcr-fill' style='width:{fill_r}%;background:{AWAY_COLOR}'></div></div>"
-            f"</div>{detail_html}</div></div>"
+            f"</div></div>{_CHEVRON}</summary>{detail_html}</details>"
         )
 
     panel_css = """
     <style>
     .wcr-panel{display:flex;flex-direction:column;gap:10px;margin-top:6px;}
-    .wcr-row{display:flex;gap:12px;padding:12px 14px;border-radius:10px;
-        background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);
-        outline:none;transition:background .15s;}
-    .wcr-row:hover,.wcr-row:focus-within{background:rgba(255,255,255,0.08);}
+    .wcr-row{border-radius:10px;background:rgba(255,255,255,0.04);
+        border:1px solid rgba(255,255,255,0.07);overflow:hidden;}
+    .wcr-row[open]{background:rgba(255,255,255,0.06);}
+    .wcr-summary{display:flex;gap:12px;align-items:flex-start;cursor:pointer;
+        padding:12px 14px;list-style:none;outline:none;}
+    .wcr-summary::-webkit-details-marker{display:none;}
+    .wcr-summary::marker{content:"";}
+    .wcr-summary:hover{background:rgba(255,255,255,0.04);}
+    .wcr-summary:focus-visible{outline:2px solid #4fc3f7;outline-offset:-2px;}
     .wcr-dot{flex:0 0 10px;width:10px;height:10px;border-radius:50%;margin-top:7px;}
     .wcr-body{flex:1;min-width:0;}
-    .wcr-head{font-weight:700;font-size:1.0rem;display:flex;align-items:center;gap:6px;}
-    .wcr-info{opacity:.45;font-size:.85rem;}
+    .wcr-head{font-weight:700;font-size:1.0rem;}
     .wcr-desc{font-size:.9rem;opacity:.85;margin-top:2px;}
     .wcr-track{display:flex;align-items:center;height:14px;margin-top:8px;}
     .wcr-half{flex:1;display:flex;height:7px;}
@@ -1122,9 +1137,11 @@ if page == "Match Predictor":
     .wcr-right{justify-content:flex-start;}
     .wcr-fill{height:7px;border-radius:4px;min-width:0;}
     .wcr-mid{width:2px;height:14px;background:#9ca3af;flex:0 0 2px;}
-    .wcr-detail{display:none;margin-top:10px;padding:8px 10px;border-radius:8px;
+    .wcr-chev{flex:0 0 18px;width:18px;height:18px;margin-top:3px;color:#cdd6ee;
+        opacity:.55;transition:transform .2s ease;}
+    .wcr-row[open] .wcr-chev{transform:rotate(180deg);}
+    .wcr-detail{margin:0 14px 12px 36px;padding:8px 10px;border-radius:8px;
         background:rgba(0,0,0,0.25);font-size:.82rem;}
-    .wcr-row:hover .wcr-detail,.wcr-row:focus-within .wcr-detail{display:block;}
     .wcr-dhead{opacity:.6;margin-bottom:4px;}
     .wcr-drow{display:flex;justify-content:space-between;gap:12px;
         padding:2px 0;font-variant-numeric:tabular-nums;}
