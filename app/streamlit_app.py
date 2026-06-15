@@ -1631,30 +1631,105 @@ else:
             f'</div>'
         )
 
-    rows = []
+    _TRK_CSS = """
+    <style>
+    .trk-list{display:flex;flex-direction:column;gap:8px;margin-top:6px;}
+    .trk-row{border-radius:10px;background:rgba(255,255,255,0.04);
+        border:1px solid rgba(255,255,255,0.07);overflow:hidden;}
+    .trk-row[open]{background:rgba(255,255,255,0.06);}
+    .trk-summary{cursor:pointer;padding:10px 14px;list-style:none;outline:none;}
+    .trk-summary::-webkit-details-marker{display:none;}
+    .trk-summary::marker{content:"";}
+    .trk-summary:hover{background:rgba(255,255,255,0.04);}
+    .trk-summary:focus-visible{outline:2px solid #4fc3f7;outline-offset:-2px;}
+    .trk-head{display:flex;align-items:center;gap:12px;}
+    .trk-date{flex:0 0 auto;color:#93a1c8;font-size:0.82rem;
+        font-variant-numeric:tabular-nums;}
+    .trk-result{flex:1;min-width:0;font-size:0.95rem;}
+    .trk-chev{flex:0 0 18px;width:18px;height:18px;color:#cdd6ee;opacity:.55;
+        transition:transform .2s ease;}
+    .trk-row[open] .trk-chev{transform:rotate(180deg);}
+    .trk-wdl{margin-top:8px;}
+    .trk-detail{padding:2px 14px 12px;}
+    .trk-dhead{opacity:.65;font-size:0.8rem;margin:2px 0 8px;}
+    .trk-verdict{margin-top:9px;font-size:0.9rem;}
+    .trk-note{margin-top:6px;font-size:0.78rem;opacity:.6;line-height:1.35;}
+    .scl-hit{border-color:#4fc3f7;
+        background:linear-gradient(160deg,#16263f 0%,#101a2e 100%);}
+    .scl-tag{font-size:0.62rem;font-weight:700;letter-spacing:0.05em;
+        text-transform:uppercase;color:#4fc3f7;border:1px solid #4fc3f7;
+        border-radius:999px;padding:1px 7px;margin-left:8px;}
+    </style>
+    """
+
+    # Tabler chevron — same accordion pattern as the SHAP reasons panel.
+    _TRK_CHEVRON = (
+        "<svg class='trk-chev' viewBox='0 0 24 24' fill='none' "
+        "stroke='currentColor' stroke-width='2' stroke-linecap='round' "
+        "stroke-linejoin='round'><path d='M6 9l6 6l6 -6'/></svg>"
+    )
+
+    def _scoreline_detail(m: dict) -> str:
+        """Top-5 pre-match scorelines (home-away) with the actual score flagged."""
+        h, a = m["home_team"], m["away_team"]
+        hs, as_ = m["home_score"], m["away_score"]
+        sl = m.get("scorelines")
+        if not sl:   # older cached payloads: derive from the locked pre-match W/D/L
+            sl = [[int(hg), int(ag), round(float(pr), 4)] for (hg, ag), pr in
+                  top_scorelines(m["p_home"], m["p_draw"], m["p_away"], top_n=5)]
+        hit_rank = next((i + 1 for i, (hg, ag, _) in enumerate(sl)
+                         if hg == hs and ag == as_), None)
+
+        items = "".join(
+            f'<div class="scl-row{" scl-hit" if (hg == hs and ag == as_) else ""}">'
+            f'<span class="scl-rank">{i}</span>'
+            f'<span class="scl-score"><span style="color:{HOME_COLOR}">{hg}</span>'
+            f'<span style="color:#5b6379;margin:0 7px">–</span>'
+            f'<span style="color:{AWAY_COLOR}">{ag}</span></span>'
+            + ('<span class="scl-tag">actual</span>' if (hg == hs and ag == as_) else "")
+            + f'<span class="scl-prob">{pr*100:.1f}%</span></div>'
+            for i, (hg, ag, pr) in enumerate(sl, start=1)
+        )
+        if hit_rank is not None:
+            verdict = (f'Actual <b>{hs}–{as_}</b> — the model\'s '
+                       f'<b>#{hit_rank}</b> scoreline at {sl[hit_rank-1][2]*100:.1f}%')
+        else:
+            verdict = f'Actual <b>{hs}–{as_}</b> — outside the model\'s top 5'
+        return (
+            f'<div class="trk-detail">'
+            f'<div class="trk-dhead">Model\'s most likely scorelines (pre-match) · '
+            f'{flag_img(h)} {short_name(h)} home – {short_name(a)} {flag_img(a)} away'
+            f'</div><div class="scl-panel">{items}</div>'
+            f'<div class="trk-verdict">{verdict}</div>'
+            f'<div class="trk-note">For entertainment only — outcome probabilities '
+            f'are far more reliable than exact scores, so a result outside the top 5 '
+            f'(expected roughly half the time) is not the model failing.</div></div>'
+        )
+
+    cards_html, first = [], True
     for m in matches:
         if m.get("p_home") is None:   # no model prediction for this match
             continue
         h, a = m["home_team"], m["away_team"]
-        rows.append(
-            f'<tr>'
-            f'<td>{m["date"]}</td>'
-            f'<td>{flag_img(h)} {short_name(h)} '
+        open_attr = " open" if first else ""   # open the newest as an expand hint
+        first = False
+        cards_html.append(
+            f'<details class="trk-row"{open_attr}><summary class="trk-summary">'
+            f'<div class="trk-head">'
+            f'<span class="trk-date">{m["date"]}</span>'
+            f'<span class="trk-result">{flag_img(h)} {short_name(h)} '
             f'<b>{m["home_score"]}–{m["away_score"]}</b> '
-            f'{short_name(a)} {flag_img(a)}</td>'
-            f'<td>{_wdl_cell(m)}</td>'
-            f'</tr>'
+            f'{short_name(a)} {flag_img(a)}</span>{_TRK_CHEVRON}</div>'
+            f'<div class="trk-wdl">{_wdl_cell(m)}</div></summary>'
+            f'{_scoreline_detail(m)}</details>'
         )
 
-    st.markdown(
-        '<div class="html-table"><table><thead><tr>'
-        '<th>Date</th><th>Result</th><th>Prediction vs reality</th>'
-        '</tr></thead><tbody>' + "".join(rows) + '</tbody></table></div>',
-        unsafe_allow_html=True,
-    )
+    st.markdown(_TRK_CSS + '<div class="trk-list">' + "".join(cards_html)
+                + '</div>', unsafe_allow_html=True)
     st.caption(
         "The three numbers are the model's pre-tournament **win / draw / loss** "
         "probabilities, tinted to their zone (home blue · draw grey · away amber). "
         "The larger **bold** number and the highlighted full-strength bar segment "
-        "mark the outcome that actually happened; the other two are dimmed."
+        "mark the outcome that actually happened; the other two are dimmed. "
+        "**Expand a match** to see the model's most likely scorelines."
     )
