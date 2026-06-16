@@ -1671,7 +1671,6 @@ else:
 
     def _scoreline_detail(m: dict) -> str:
         """Top-5 pre-match scorelines (home-away) with the actual score flagged."""
-        h, a = m["home_team"], m["away_team"]
         hs, as_ = m["home_score"], m["away_score"]
         sl = m.get("scorelines")
         if not sl:   # older cached payloads: derive from the locked pre-match W/D/L
@@ -1697,8 +1696,7 @@ else:
             verdict = f'Actual <b>{hs}–{as_}</b> — outside the model\'s top 5'
         return (
             f'<div class="trk-detail">'
-            f'<div class="trk-dhead">Model\'s most likely scorelines (pre-match) · '
-            f'{flag_img(h)} {short_name(h)} home – {short_name(a)} {flag_img(a)} away'
+            f'<div class="trk-dhead">Model\'s most likely scorelines (pre-match)'
             f'</div><div class="scl-panel">{items}</div>'
             f'<div class="trk-verdict">{verdict}</div>'
             f'<div class="trk-note">For entertainment only — outcome probabilities '
