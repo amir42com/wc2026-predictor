@@ -807,7 +807,7 @@ st.sidebar.markdown(f"""
     <a href="https://www.linkedin.com/in/amir42com/" target="_blank">{_ICON_LINKEDIN} LinkedIn</a> ·
     <a href="https://github.com/amir42com/wc2026-predictor" target="_blank">{_ICON_GITHUB} GitHub</a>
   </p>
-  <p class="credits-version">v1.5 · June 2026</p>
+  <p class="credits-version">v2.0 · June 2026</p>
 </div>
 """, unsafe_allow_html=True)
 
