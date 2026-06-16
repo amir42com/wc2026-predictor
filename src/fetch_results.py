@@ -97,15 +97,58 @@ def fetch_raw_matches(key: str, timeout: int = 30) -> list[dict]:
     return resp.json().get("matches", [])
 
 
+def _parse_utc(s: str | None) -> datetime | None:
+    """Parse an ISO-8601 UTC timestamp (…Z) to an aware datetime, or None."""
+    if not s:
+        return None
+    try:
+        return datetime.fromisoformat(s.replace("Z", "+00:00"))
+    except Exception:
+        return None
+
+
+def _pick_next_fixture(raw: list[dict], now: datetime) -> dict | None:
+    """
+    Choose the genuine next fixture from raw football-data.org matches.
+
+    A currently-live match (IN_PLAY/PAUSED) takes priority as the "current" one;
+    otherwise the earliest match whose kickoff is still in the FUTURE
+    (TIMED/SCHEDULED with utcDate > now) is used. Selecting on the kickoff time —
+    not just the status — means a finished or already-started match is never
+    picked even if the feed is slow to flip its status, and the default keeps
+    advancing as matches kick off. Matches whose team names don't normalize are
+    skipped so one unmappable fixture can't break the default. Returns the
+    normalized dict (home/away/utc/status) or None.
+    """
+    cands: list[tuple[int, str, dict]] = []
+    for m in raw:
+        status = m.get("status")
+        ko = _parse_utc(m.get("utcDate"))
+        is_live = status in ("IN_PLAY", "PAUSED")
+        is_upcoming = (status in ("TIMED", "SCHEDULED")
+                       and ko is not None and ko > now)
+        if is_live or is_upcoming:
+            # live first (rank 0), then earliest future kickoff
+            cands.append((0 if is_live else 1, m.get("utcDate") or "9999-12-31", m))
+
+    cands.sort(key=lambda t: (t[0], t[1]))
+    for _, _, m in cands:
+        home = map_team((m.get("homeTeam") or {}).get("name"))
+        away = map_team((m.get("awayTeam") or {}).get("name"))
+        if home and away:
+            return {"home": home, "away": away,
+                    "utc": m.get("utcDate"), "status": m.get("status")}
+    return None
+
+
 def get_next_fixture() -> dict | None:
     """
     Next upcoming WC 2026 fixture, with team names normalized to the app's names:
         {"home": str, "away": str, "utc": str, "status": str}
 
-    A currently-live match (IN_PLAY/PAUSED) is treated as the current/next one;
-    otherwise the earliest future kickoff (TIMED/SCHEDULED) is used. Filtered to
-    the World Cup competition via API_URL. Returns None on any failure or when
-    there is no upcoming fixture, so the caller can fall back gracefully.
+    Earliest future kickoff (a live match counts as current); see
+    _pick_next_fixture for the selection rule. Returns None on any failure or
+    when there is no upcoming fixture, so the caller can fall back gracefully.
     """
     try:
         key = get_api_key()
@@ -114,26 +157,7 @@ def get_next_fixture() -> dict | None:
         raw = fetch_raw_matches(key)
     except Exception:
         return None
-
-    live, upcoming = [], []
-    for m in raw:
-        status = m.get("status")
-        if status in ("IN_PLAY", "PAUSED"):
-            live.append(m)
-        elif status in ("TIMED", "SCHEDULED"):
-            upcoming.append(m)
-
-    pool = live or upcoming
-    if not pool:
-        return None
-    pick = min(pool, key=lambda m: m.get("utcDate") or "9999-12-31")
-
-    home = map_team((pick.get("homeTeam") or {}).get("name"))
-    away = map_team((pick.get("awayTeam") or {}).get("name"))
-    if not home or not away:
-        return None
-    return {"home": home, "away": away,
-            "utc": pick.get("utcDate"), "status": pick.get("status")}
+    return _pick_next_fixture(raw, datetime.now(timezone.utc))
 
 
 def scorelines_for_proba(p_home: float, p_draw: float, p_away: float,

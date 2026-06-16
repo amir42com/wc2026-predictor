@@ -100,6 +100,42 @@ def main() -> int:
         assert scorelines_for_proba(*p, top_n=5) == sl, "scorelines not deterministic"
         print(f"(top-5 home-away, sorted, deterministic; #1 {sl[0][0]}-{sl[0][1]}) ", end="")
 
+    def next_fixture_selection():
+        # The homepage default must pick the earliest FUTURE-kickoff fixture,
+        # never a finished/already-started one, prefer a live match, and skip
+        # fixtures whose team names don't normalize.
+        from datetime import datetime, timezone
+        from fetch_results import _pick_next_fixture
+
+        now = datetime(2026, 6, 15, 21, 0, 0, tzinfo=timezone.utc)
+
+        def M(h, a, status, utc):
+            return {"homeTeam": {"name": h} if h else None,
+                    "awayTeam": {"name": a} if a else None,
+                    "status": status, "utcDate": utc}
+
+        base = [
+            M("Belgium", "Egypt", "FINISHED", "2026-06-14T18:00:00Z"),     # finished
+            M("Spain", "Cape Verde", "TIMED", "2026-06-15T20:00:00Z"),     # kicked off, status lag
+            M("Saudi Arabia", "Uruguay", "TIMED", "2026-06-15T22:00:00Z"), # earliest FUTURE
+            M("Iran", "New Zealand", "TIMED", "2026-06-16T01:00:00Z"),     # later future
+        ]
+        fx = _pick_next_fixture(base, now)
+        assert fx and (fx["home"], fx["away"]) == ("Saudi Arabia", "Uruguay"), \
+            f"expected Saudi Arabia/Uruguay, got {fx}"
+
+        # a live match is the current one even if a future TIMED exists
+        live = _pick_next_fixture(
+            base + [M("France", "Senegal", "IN_PLAY", "2026-06-15T19:00:00Z")], now)
+        assert live and live["status"] == "IN_PLAY" and live["home"] == "France", \
+            f"live match not prioritised, got {live}"
+
+        # an unmappable earliest fixture is skipped, not fallen back from
+        skip = _pick_next_fixture(
+            [M(None, None, "TIMED", "2026-06-15T21:30:00Z")] + base, now)
+        assert skip and skip["home"] == "Saudi Arabia", f"did not skip unmapped, got {skip}"
+        print("(future-earliest, excludes finished/past, live-priority, skips unmapped) ", end="")
+
     def grouping_reconciliation():
         # The plain-language reasons SUM raw SHAP per group. Grouping must lose
         # nothing (group sums == total SHAP) and the SHAP must stay additive to
@@ -153,6 +189,7 @@ def main() -> int:
         ("predict Argentina-France", predict_fixture),
         ("scoreline consistency",    scoreline_consistency),
         ("pre-match scoreline log",  scoreline_logging),
+        ("next-fixture selection",   next_fixture_selection),
         ("SHAP grouping reconcile",  grouping_reconciliation),
         ("100-sim Monte Carlo",      run_monte_carlo),
     ]

@@ -844,6 +844,14 @@ def next_fixture_defaults() -> tuple[str, str]:
     fallback = ("Argentina", "France")
     try:
         fx = _cached_next_fixture()
+        # Auto-advance: if the hourly-cached fixture has already kicked off (and
+        # isn't the live match), the cache is stale — clear it once and refetch
+        # so the default moves on to the next genuinely-upcoming match.
+        ko = fetch_results._parse_utc(fx.get("utc"))
+        if (ko is not None and ko <= datetime.now(timezone.utc)
+                and fx.get("status") not in ("IN_PLAY", "PAUSED")):
+            _cached_next_fixture.clear()
+            fx = _cached_next_fixture()
     except Exception:
         return fallback
     home = fx.get("home") if fx.get("home") in WC_TEAMS else fallback[0]
