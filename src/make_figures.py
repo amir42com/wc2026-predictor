@@ -23,11 +23,18 @@ import matplotlib.pyplot as plt
 REPORTS_DIR = Path(__file__).resolve().parents[1] / "reports"
 FIG_DIR = REPORTS_DIR / "figures"
 
-# Shared colours — keep the article visually consistent with the app.
-COL_XGB = "#94a3b8"   # slate
-COL_BLEND = "#3b82f6"  # home blue (the production model)
-COL_ELO = "#f59e0b"   # amber
+# Outcome palette — RESERVED for match outcomes (home/draw/away). Used by
+# Figure 5 (reliability) only; mirrors the app's blue/grey/amber convention.
 CLASS_COLORS = {"home": "#3b82f6", "draw": "#93a1c8", "away": "#f59e0b"}
+
+# System palette — for figures that compare the three SYSTEMS (Figures 3 & 4).
+# Deliberately NOT the outcome blue/grey/amber: violet family = "my models",
+# teal = the Elo benchmark that beat them, set visually apart.
+SYSTEM_COLORS = {
+    "Raw XGBoost":  "#9C8AC9",   # light violet
+    "Blend":        "#6C4AA6",   # deep violet (production model)
+    "Elo baseline": "#2A9D8F",   # teal (the benchmark)
+}
 
 
 # --------------------------------------------------------------------------- #
@@ -115,9 +122,9 @@ def figure4(df: pd.DataFrame) -> None:
     y = df["y_true"].values
 
     specs = [
-        ("Raw XGBoost", ["xgb_home", "xgb_draw", "xgb_away"], COL_XGB),
-        ("Blend",       ["blend_home", "blend_draw", "blend_away"], COL_BLEND),
-        ("Elo",         ["elo_home", "elo_draw", "elo_away"], COL_ELO),
+        ("Raw XGBoost", ["xgb_home", "xgb_draw", "xgb_away"], SYSTEM_COLORS["Raw XGBoost"]),
+        ("Blend",       ["blend_home", "blend_draw", "blend_away"], SYSTEM_COLORS["Blend"]),
+        ("Elo",         ["elo_home", "elo_draw", "elo_away"], SYSTEM_COLORS["Elo baseline"]),
     ]
 
     labels, ks, accs, los, his, colors = [], [], [], [], [], []
