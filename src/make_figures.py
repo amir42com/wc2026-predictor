@@ -215,7 +215,8 @@ def figure5(df: pd.DataFrame) -> None:
     class_names = {0: "home", 1: "draw", 2: "away"}
 
     fig, ax = plt.subplots(figsize=(6.4, 6.0))
-    ax.plot([0, 1], [0, 1], "--", color="#9ca3af", linewidth=1.2,
+    _dark_axes(fig, ax)
+    ax.plot([0, 1], [0, 1], "--", color=DARK_TEXT2, linewidth=1.2,
             label="Perfect calibration", zorder=1)
 
     for c in range(3):
@@ -226,7 +227,7 @@ def figure5(df: pd.DataFrame) -> None:
         ax.plot(xs, ys, "-", color=OUTCOME_COLORS[name], linewidth=1.6,
                 alpha=0.9, zorder=2)
         ax.scatter(xs, ys, s=sizes, color=OUTCOME_COLORS[name],
-                   edgecolor="#1f2937", linewidth=0.6, zorder=3,
+                   edgecolor=DARK_BG, linewidth=0.6, zorder=3,
                    label=f"{name.capitalize()}  (ECE {per_class[c]*100:.1f}%)")
 
     ax.set_xlim(0, 1)
@@ -238,15 +239,18 @@ def figure5(df: pd.DataFrame) -> None:
                  f"Overall multiclass ECE = {overall_ece*100:.1f}%  "
                  "(point size ∝ bin count)",
                  fontsize=11.5)
-    ax.legend(loc="upper left", fontsize=9, framealpha=0.95)
-    ax.grid(color="#eceff3", linewidth=0.7, zorder=0)
+    leg = ax.legend(loc="upper left", fontsize=9, framealpha=0.92,
+                    facecolor="#151d3b", edgecolor=DARK_SPINE)
+    for txt in leg.get_texts():
+        txt.set_color(DARK_TEXT)
+    ax.grid(color=DARK_GRID, linewidth=0.7, zorder=0)
     ax.set_axisbelow(True)
     for s in ("top", "right"):
         ax.spines[s].set_visible(False)
 
     fig.tight_layout()
     out = FIG_DIR / "figure5_blend_reliability.png"
-    fig.savefig(out, dpi=150)
+    fig.savefig(out, dpi=220, facecolor=DARK_BG)
     plt.close(fig)
     print(f"Wrote {out}")
     print("  Blend reliability — Expected Calibration Error:")
