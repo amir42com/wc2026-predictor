@@ -25,18 +25,38 @@ import matplotlib.pyplot as plt
 REPORTS_DIR = Path(__file__).resolve().parents[1] / "reports"
 FIG_DIR = REPORTS_DIR / "figures"
 
+# Dark theme — matches the app (navy canvas). Baked into every saved figure.
+DARK_BG = "#0c1124"     # figure + axes facecolor
+DARK_TEXT = "#e8ecf6"   # primary text / titles
+DARK_TEXT2 = "#93a1c8"  # secondary text / tick labels
+DARK_GRID = "#1d2547"   # gridlines
+DARK_SPINE = "#26305a"  # axis spines
+ACCENT = "#4fc3f7"      # accent / highlight
+
 # Outcome palette — RESERVED for match outcomes (home/draw/away). Used by
-# Figure 5 (reliability) only; mirrors the app's blue/grey/amber convention.
-CLASS_COLORS = {"home": "#3b82f6", "draw": "#93a1c8", "away": "#f59e0b"}
+# Figure 5 (reliability) only; lightened to read on the navy background.
+OUTCOME_COLORS = {"home": "#4fc3f7", "draw": "#b4bdd1", "away": "#f59e0b"}
 
 # System palette — for figures that compare the three SYSTEMS (Figures 3 & 4).
-# Deliberately NOT the outcome blue/grey/amber: violet family = "my models",
-# teal = the Elo benchmark that beat them, set visually apart.
+# Deliberately NOT the outcome palette: violet family = "my models", teal =
+# the Elo benchmark that beat them. Tuned to read on the dark background.
 SYSTEM_COLORS = {
-    "Raw XGBoost":  "#9C8AC9",   # light violet
-    "Blend":        "#6C4AA6",   # deep violet (production model)
-    "Elo baseline": "#2A9D8F",   # teal (the benchmark)
+    "Raw XGBoost":  "#B6A8E0",   # light violet
+    "Blend":        "#9B7BE0",   # brighter violet (production model)
+    "Elo baseline": "#2DD4BF",   # bright teal (the benchmark)
 }
+
+
+def _dark_axes(fig, ax) -> None:
+    """Apply the dark theme tokens to a figure + axes (chart figures)."""
+    fig.patch.set_facecolor(DARK_BG)
+    ax.set_facecolor(DARK_BG)
+    ax.tick_params(colors=DARK_TEXT2)
+    for spine in ax.spines.values():
+        spine.set_color(DARK_SPINE)
+    ax.title.set_color(DARK_TEXT)
+    ax.xaxis.label.set_color(DARK_TEXT)
+    ax.yaxis.label.set_color(DARK_TEXT)
 
 
 # --------------------------------------------------------------------------- #
@@ -142,38 +162,40 @@ def figure4(df: pd.DataFrame) -> None:
         colors.append(color)
 
     fig, ax = plt.subplots(figsize=(7.2, 4.8))
+    _dark_axes(fig, ax)
     x = np.arange(len(labels))
     accs = np.array(accs)
     yerr = np.vstack([accs - np.array(los), np.array(his) - accs])
 
-    bars = ax.bar(x, accs, width=0.58, color=colors, edgecolor="#1f2937",
+    bars = ax.bar(x, accs, width=0.58, color=colors, edgecolor=DARK_BG,
                   linewidth=0.8, zorder=2)
-    ax.errorbar(x, accs, yerr=yerr, fmt="none", ecolor="#1f2937",
+    ax.errorbar(x, accs, yerr=yerr, fmt="none", ecolor=DARK_TEXT,
                 elinewidth=1.5, capsize=8, capthick=1.5, zorder=3)
 
     for xi, (acc, k, lo, hi) in enumerate(zip(accs, ks, los, his)):
         ax.text(xi, acc + 0.002, f"{acc*100:.1f}%\n({k}/{n})",
-                ha="center", va="bottom", fontsize=10, fontweight="bold")
+                ha="center", va="bottom", fontsize=10, fontweight="bold",
+                color=DARK_TEXT)
         ax.text(xi, hi + 0.006, f"95% CI\n[{lo*100:.1f}, {hi*100:.1f}]",
-                ha="center", va="bottom", fontsize=8, color="#475569")
+                ha="center", va="bottom", fontsize=8, color=DARK_TEXT2)
 
     ax.set_ylim(0.40, 0.70)
     ax.set_xticks(x)
-    ax.set_xticklabels(labels, fontsize=11)
+    ax.set_xticklabels(labels, fontsize=11, color=DARK_TEXT)
     ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda v, _: f"{v*100:.0f}%"))
     ax.set_ylabel("Accuracy", fontsize=11)
     ax.set_title("WC backtest accuracy (192 matches, 2014/2018/2022)\n"
                  "Point estimates differ by ~5 matches; Wilson 95% intervals "
                  "overlap heavily",
                  fontsize=11.5)
-    ax.grid(axis="y", color="#e5e7eb", linewidth=0.7, zorder=0)
+    ax.grid(axis="y", color=DARK_GRID, linewidth=0.7, zorder=0)
     ax.set_axisbelow(True)
     for s in ("top", "right"):
         ax.spines[s].set_visible(False)
 
     fig.tight_layout()
     out = FIG_DIR / "figure4_accuracy_wilson.png"
-    fig.savefig(out, dpi=150)
+    fig.savefig(out, dpi=220, facecolor=DARK_BG)
     plt.close(fig)
     print(f"Wrote {out}")
     print("  Accuracy (k/n) with 95% Wilson intervals:")
@@ -201,9 +223,9 @@ def figure5(df: pd.DataFrame) -> None:
         hit = (y == c).astype(float)
         xs, ys, ns = _reliability_points(hit, proba[:, c], n_bins=10)
         sizes = 30 + (ns / ns.max()) * 120
-        ax.plot(xs, ys, "-", color=CLASS_COLORS[name], linewidth=1.6,
+        ax.plot(xs, ys, "-", color=OUTCOME_COLORS[name], linewidth=1.6,
                 alpha=0.9, zorder=2)
-        ax.scatter(xs, ys, s=sizes, color=CLASS_COLORS[name],
+        ax.scatter(xs, ys, s=sizes, color=OUTCOME_COLORS[name],
                    edgecolor="#1f2937", linewidth=0.6, zorder=3,
                    label=f"{name.capitalize()}  (ECE {per_class[c]*100:.1f}%)")
 
