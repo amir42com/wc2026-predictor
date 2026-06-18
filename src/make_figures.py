@@ -293,6 +293,8 @@ def figure3() -> None:
 
     plt.rcParams["font.family"] = "DejaVu Sans"  # clean sans-serif
     fig, ax = plt.subplots(figsize=(7.6, 3.0))
+    fig.patch.set_facecolor(DARK_BG)
+    ax.set_facecolor(DARK_BG)
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
     ax.axis("off")
@@ -311,11 +313,11 @@ def figure3() -> None:
     top = header_y0
     row_bands = [(top - (i + 1) * row_h, top - i * row_h) for i in range(len(data))]
 
-    INK = "#1f2937"
-    GREY = "#5b6473"
-    SEP = "#d9dce1"
-    HEADER_BG = "#eef0f3"
-    HIGHLIGHT = "#e7f3f0"  # very light teal — subtle "best" emphasis
+    INK = DARK_TEXT          # primary text on dark
+    GREY = DARK_TEXT2        # muted footnote
+    SEP = DARK_SPINE         # row separators / rules
+    HEADER_BG = "#151d3b"    # header fill
+    HIGHLIGHT = "#16304a"    # subtle accent-tinted band for the best value
 
     # Header band
     ax.add_patch(plt.Rectangle((0, header_y0), 1, header_y1 - header_y0,
@@ -372,7 +374,7 @@ def figure3() -> None:
             ha="left", va="top", fontsize=8, color=GREY, zorder=3)
 
     out = FIG_DIR / "figure3_backtest_table.png"
-    fig.savefig(out, dpi=220, bbox_inches="tight", facecolor="white")
+    fig.savefig(out, dpi=220, bbox_inches="tight", facecolor=DARK_BG)
     plt.close(fig)
     plt.rcParams["font.family"] = plt.rcParamsDefault["font.family"]
     print(f"Wrote {out}")
