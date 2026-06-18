@@ -1,8 +1,10 @@
 """
-Article figures 4 and 5 from the row-level backtest export.
+Article figures 3, 4 and 5 from the backtest export.
 
-Reads  reports/backtest_predictions.csv  (written by src/export_backtest.py)
-Writes reports/figures/figure4_accuracy_wilson.png
+Reads  reports/backtest_predictions.csv     (written by src/export_backtest.py)
+       reports/backtest_metrics_summary.csv  (combined row → Figure 3 table)
+Writes reports/figures/figure3_backtest_table.png
+       reports/figures/figure4_accuracy_wilson.png
        reports/figures/figure5_blend_reliability.png
 
 matplotlib only (no seaborn).
@@ -231,10 +233,135 @@ def figure5(df: pd.DataFrame) -> None:
     print(f"    overall ECE {overall_ece*100:.2f}%")
 
 
+# --------------------------------------------------------------------------- #
+# Figure 3 — combined backtest comparison table (rendered as an image)
+# --------------------------------------------------------------------------- #
+def _combined_metrics() -> pd.DataFrame:
+    """
+    Pull the COMBINED (192-match) row for each system from the metrics summary,
+    so the table can never drift from the data. Returns rows in fixed order
+    (Raw XGBoost, Blend, Elo baseline) with display names.
+    """
+    summary = pd.read_csv(REPORTS_DIR / "backtest_metrics_summary.csv")
+    comb = summary[summary["tournament"] == "Combined"].set_index("model")
+    order = [("Raw XGBoost", "Raw XGBoost"),
+             ("Blend", "Blend"),
+             ("Elo", "Elo baseline")]
+    rows = []
+    for csv_name, display in order:
+        r = comb.loc[csv_name]
+        rows.append({"system": display,
+                     "accuracy": float(r["accuracy"]),
+                     "log_loss": float(r["log_loss"]),
+                     "brier": float(r["brier"])})
+    return pd.DataFrame(rows)
+
+
+def figure3() -> None:
+    data = _combined_metrics()
+
+    # Best per metric: accuracy higher is better; log-loss / Brier lower.
+    best = {"accuracy": int(data["accuracy"].idxmax()),
+            "log_loss": int(data["log_loss"].idxmin()),
+            "brier":    int(data["brier"].idxmin())}
+
+    plt.rcParams["font.family"] = "DejaVu Sans"  # clean sans-serif
+    fig, ax = plt.subplots(figsize=(7.6, 3.0))
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.axis("off")
+
+    # Column x-anchors (right edges for the numeric columns)
+    x_swatch = (0.015, 0.034)
+    x_system = 0.060
+    cols = {"accuracy": (0.40, 0.575),   # (cell left, right-align x)
+            "log_loss": (0.60, 0.775),
+            "brier":    (0.80, 0.975)}
+    headers = {"accuracy": "Accuracy", "log_loss": "Log-loss", "brier": "Brier"}
+
+    # Row geometry
+    header_y0, header_y1 = 0.80, 0.96
+    row_h = 0.175
+    top = header_y0
+    row_bands = [(top - (i + 1) * row_h, top - i * row_h) for i in range(len(data))]
+
+    INK = "#1f2937"
+    GREY = "#5b6473"
+    SEP = "#d9dce1"
+    HEADER_BG = "#eef0f3"
+    HIGHLIGHT = "#e7f3f0"  # very light teal — subtle "best" emphasis
+
+    # Header band
+    ax.add_patch(plt.Rectangle((0, header_y0), 1, header_y1 - header_y0,
+                               facecolor=HEADER_BG, edgecolor="none", zorder=1))
+    hy = (header_y0 + header_y1) / 2
+    ax.text(x_system, hy, "System", ha="left", va="center",
+            fontsize=11.5, fontweight="bold", color=INK, zorder=3)
+    for key, (_, xr) in cols.items():
+        ax.text(xr, hy, headers[key], ha="right", va="center",
+                fontsize=11.5, fontweight="bold", color=INK, zorder=3)
+
+    # Top + bottom rules of the table
+    ax.plot([0, 1], [header_y1, header_y1], color=INK, linewidth=1.3, zorder=2)
+    ax.plot([0, 1], [header_y0, header_y0], color=INK, linewidth=1.0, zorder=2)
+    ax.plot([0, 1], [row_bands[-1][0], row_bands[-1][0]], color=INK,
+            linewidth=1.3, zorder=2)
+
+    for i, (y0, y1) in enumerate(row_bands):
+        yc = (y0 + y1) / 2
+        row = data.iloc[i]
+        sys_color = SYSTEM_COLORS[row["system"]]
+
+        # Left colour swatch tying the row to its Figure 4 bar
+        ax.add_patch(plt.Rectangle((x_swatch[0], y0 + 0.018),
+                                   x_swatch[1] - x_swatch[0], (y1 - y0) - 0.036,
+                                   facecolor=sys_color, edgecolor="none", zorder=3))
+
+        # System name
+        ax.text(x_system, yc, row["system"], ha="left", va="center",
+                fontsize=11, color=INK, zorder=3)
+
+        # Numeric cells (right-aligned), best value highlighted + bold
+        values = {"accuracy": f"{row['accuracy']*100:.1f}%",
+                  "log_loss": f"{row['log_loss']:.4f}",
+                  "brier":    f"{row['brier']:.4f}"}
+        for key, (xl, xr) in cols.items():
+            is_best = best[key] == i
+            if is_best:
+                ax.add_patch(plt.Rectangle((xl, y0 + 0.012), xr - xl + 0.02,
+                                           (y1 - y0) - 0.024, facecolor=HIGHLIGHT,
+                                           edgecolor="none", zorder=2))
+            ax.text(xr, yc, values[key], ha="right", va="center",
+                    fontsize=11, color=INK,
+                    fontweight="bold" if is_best else "normal", zorder=4)
+
+        # Light separator between data rows
+        if i < len(row_bands) - 1:
+            ax.plot([0, 1], [y0, y0], color=SEP, linewidth=0.8, zorder=2)
+
+    # Footnote inside the image
+    ax.text(0, row_bands[-1][0] - 0.10,
+            "Accuracy higher is better; log-loss and Brier lower is better.  "
+            "192 matches, WC 2014/2018/2022, leakage-free.",
+            ha="left", va="top", fontsize=8, color=GREY, zorder=3)
+
+    out = FIG_DIR / "figure3_backtest_table.png"
+    fig.savefig(out, dpi=220, bbox_inches="tight", facecolor="white")
+    plt.close(fig)
+    plt.rcParams["font.family"] = plt.rcParamsDefault["font.family"]
+    print(f"Wrote {out}")
+    print("  Combined-row values pulled from the metrics summary:")
+    for _, r in data.iterrows():
+        print(f"    {r['system']:<13} acc {r['accuracy']*100:5.1f}%   "
+              f"log-loss {r['log_loss']:.4f}   Brier {r['brier']:.4f}")
+
+
 def main() -> None:
     FIG_DIR.mkdir(parents=True, exist_ok=True)
     df = pd.read_csv(REPORTS_DIR / "backtest_predictions.csv")
     print(f"Loaded {len(df)} match rows from backtest_predictions.csv\n")
+    figure3()
+    print()
     figure4(df)
     print()
     figure5(df)
