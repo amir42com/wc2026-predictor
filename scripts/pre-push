@@ -1,7 +1,15 @@
 #!/bin/sh
-# Run the smoke test before every push; abort the push if it fails.
-echo "pre-push: running smoke test ..."
+# Check version sync and run the smoke test before every push; abort on failure.
 cd "$(git rev-parse --show-toplevel)" || exit 1
+
+echo "pre-push: checking version sync ..."
+.venv/Scripts/python.exe scripts/sync_version.py --check
+if [ $? -ne 0 ]; then
+    echo "pre-push: version drift - push aborted. Fix it with: python scripts/sync_version.py"
+    exit 1
+fi
+
+echo "pre-push: running smoke test ..."
 .venv/Scripts/python.exe src/smoke_test.py
 status=$?
 if [ $status -ne 0 ]; then
