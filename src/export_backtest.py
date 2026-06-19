@@ -6,8 +6,9 @@ model trained only on matches strictly before that tournament's first match)
 and writes, for every match:
 
   * the raw XGBoost probabilities   (model.predict_proba, BEFORE blending)
-  * the production blend            (ELO_BLEND_W * XGB + (1-ELO_BLEND_W) * Elo)
-  * the naive Elo-baseline          (elo_baseline_proba)
+  * the production blend            (ELO_BLEND_W * XGB + (1-ELO_BLEND_W) * the
+                                     DEPLOYED Elo prior, fixed 0.227 draw share)
+  * the naive Elo-baseline          (elo_baseline_proba, fold-specific draw rate)
 
 Outputs (tracked, publishable with the article):
   reports/backtest_predictions.csv       one row per match, all three models
@@ -30,7 +31,8 @@ import pandas as pd
 from sklearn.metrics import accuracy_score, log_loss
 
 from train import ELO_BLEND_W, make_X, train_model
-from backtest import BACKTEST_YEARS, brier_multiclass, elo_baseline_proba
+from backtest import (BACKTEST_YEARS, brier_multiclass, elo_baseline_proba,
+                      production_blend_prior)
 
 PROCESSED_DIR = Path(__file__).resolve().parents[1] / "data" / "processed"
 REPORTS_DIR = Path(__file__).resolve().parents[1] / "reports"
@@ -67,11 +69,13 @@ def _fold_predictions(df: pd.DataFrame) -> list[dict]:
 
         # Raw XGB (before the Elo blend)
         xgb_proba = model.predict_proba(X_wc)
-        # Elo baseline — draw rate from the same pre-tournament window (no leakage)
+        # Naive Elo baseline — fold-specific draw rate (no leakage)
         draw_rate = float((df_pre["outcome"] == 1).mean())
         elo_proba = elo_baseline_proba(df_wc, draw_rate)
-        # Production blend (identical to backtest.py)
-        blend_proba = ELO_BLEND_W * xgb_proba + (1 - ELO_BLEND_W) * elo_proba
+        # Production blend (identical to backtest.py): XGB + the DEPLOYED Elo
+        # prior (fixed 0.227 draw share), NOT the fold-specific baseline.
+        blend_proba = (ELO_BLEND_W * xgb_proba
+                       + (1 - ELO_BLEND_W) * production_blend_prior(df_wc))
 
         folds.append({
             "tournament": f"WC {year}",
