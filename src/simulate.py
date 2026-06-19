@@ -29,6 +29,18 @@ from third_place_mapping import lookup as annexe_c_lookup, check_eligibility
 PROCESSED_DIR = Path(__file__).resolve().parents[1] / "data" / "processed"
 MODELS_DIR    = Path(__file__).resolve().parents[1] / "models"
 
+# ── Leakage cutoff for the live serving path (single source of truth) ──────
+# WC 2026's first match is 2026-06-11. Every prediction the app/tracker serves
+# must be made from team state built ONLY from matches STRICTLY BEFORE this
+# date, so a cold-start rebuild from the live martj42 feed (which gains 2026 WC
+# results during the tournament) can never fold a tournament result into the
+# "pre-tournament" model state. Predictor truncates its loaded state here and
+# refuses to serve if any tournament-dated match leaks in; the Streamlit
+# bootstrap truncates raw data here before rebuilding features/elo. This is the
+# SERVING path only — backtest.py / experiments.py use their own per-tournament
+# historical cutoffs and never import this constant.
+PRE_TOURNAMENT_CUTOFF = pd.Timestamp("2026-06-11")
+
 # ── WC 2026 draw (5 December 2025, Washington D.C.) ───────────────────────
 GROUPS: dict[str, list[str]] = {
     "A": ["Mexico",        "South Africa",          "South Korea",  "Czech Republic"],
@@ -111,12 +123,42 @@ class Predictor:
     gets a spurious venue advantage.  Results are cached per unordered pair.
     """
 
-    def __init__(self, features_path: Path, elo_path: Path, bundle: dict) -> None:
+    def __init__(self, features_path: Path, elo_path: Path, bundle: dict,
+                 cutoff: "pd.Timestamp | None" = PRE_TOURNAMENT_CUTOFF) -> None:
         self._model        = bundle["model"]
         self._feature_cols = bundle["feature_cols"]
 
         df     = pd.read_csv(features_path, parse_dates=["date"]).sort_values("date")
         elo_df = pd.read_csv(elo_path).set_index("team")
+
+        # Leakage guard: hard-cap the team state at the pre-tournament cutoff.
+        # Even if features.csv was rebuilt mid-tournament from the live feed, the
+        # state used to serve predictions only ever sees matches strictly before
+        # the cutoff. (The Elo override below comes from elo_ratings.csv, which
+        # the serving bootstrap likewise rebuilds from pre-cutoff raw data.)
+        if cutoff is not None:
+            n_leaked = int((df["date"] >= cutoff).sum())
+            if n_leaked:
+                # Loud signal: the source carried tournament-dated matches. We
+                # drop them so leaked results can never reach a prediction.
+                print(f"  WARNING: features source has {n_leaked} match(es) dated "
+                      f">= {cutoff.date()}; dropping them from model state "
+                      f"(leakage prevented).")
+            df = df[df["date"] < cutoff].reset_index(drop=True)
+            if df.empty:
+                raise RuntimeError(
+                    f"Predictor: no matches strictly before {cutoff.date()} in "
+                    f"{features_path} — refusing to serve (cannot build "
+                    f"pre-tournament team state).")
+            max_date = df["date"].max()
+            # Invariant after truncation: the state never includes the cutoff or later.
+            assert max_date < cutoff, f"leak guard failed: {max_date} >= {cutoff}"
+            self._state_max_date = max_date
+            print(f"  Predictor state capped at < {cutoff.date()} "
+                  f"(latest match {max_date.date()})")
+        else:
+            self._state_max_date = df["date"].max() if len(df) else None
+        self._cutoff = cutoff
 
         # Latest pre-match state for each team (last row they appeared in)
         state: dict[str, dict] = {}
