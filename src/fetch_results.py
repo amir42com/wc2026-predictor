@@ -2,10 +2,12 @@
 Fetch finished WC 2026 results from football-data.org, score them against the
 model's pre-tournament predictions, and cache to data/wc2026_results.json.
 
-The model's team state comes from data/processed/features.csv, which ends the
-day before the tournament (2026-06-10).  As long as that file is NOT rebuilt to
-include tournament matches, every prediction here is leakage-free: the model has
-never seen a single WC 2026 result.
+The model's team state comes from data/processed/features.csv. The Predictor
+hard-caps that state at simulate.PRE_TOURNAMENT_CUTOFF (the WC 2026 first-match
+date) IN CODE and refuses to serve if any tournament-dated match leaks in, so
+every prediction here is leakage-free even if features.csv was rebuilt mid-
+tournament from the live feed. Only the model's TEAM STATE is frozen at the
+cutoff — the live RESULTS fetch below (actual scores) is intentionally current.
 
 API key resolution (never hardcoded):
     1. environment variable FOOTBALL_DATA_KEY            (standalone / CI)

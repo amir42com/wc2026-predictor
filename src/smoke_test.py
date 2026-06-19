@@ -16,7 +16,7 @@ from pathlib import Path
 import joblib
 import numpy as np
 
-from simulate import GROUPS, Predictor, monte_carlo
+from simulate import GROUPS, Predictor, monte_carlo, PRE_TOURNAMENT_CUTOFF
 from scorelines import grid_wdl, scoreline_grid, top_scorelines
 from explain import build_reasons, group_contributions
 
@@ -183,6 +183,17 @@ def main() -> int:
                     f"reason side != sign for {home}-{away}: {r['group']}"
         print("(group sums == total SHAP, additive, signs consistent) ", end="")
 
+    def leakage_cutoff():
+        # The live Predictor's team state must be hard-capped strictly before
+        # the pre-tournament cutoff — no WC 2026 match may leak into the state
+        # that serves "pre-tournament" predictions, even on a cold rebuild.
+        p = predictor["p"]
+        assert p._cutoff == PRE_TOURNAMENT_CUTOFF, "predictor cutoff not set"
+        assert p._state_max_date is not None, "no state max date recorded"
+        assert p._state_max_date < PRE_TOURNAMENT_CUTOFF, (
+            f"state max date {p._state_max_date} >= cutoff {PRE_TOURNAMENT_CUTOFF}")
+        print(f"(state max {p._state_max_date.date()} < cutoff {PRE_TOURNAMENT_CUTOFF.date()}) ", end="")
+
     def annexe_c_mapping():
         # Official FIFA 2026 Annexe C third-place table loads & validates, a
         # known combination resolves, and the eligibility cross-check against
@@ -202,6 +213,7 @@ def main() -> int:
     steps = [
         ("load model bundle",        load_bundle),
         ("build Predictor",          load_predictor),
+        ("leakage cutoff (state)",   leakage_cutoff),
         ("predict Argentina-France", predict_fixture),
         ("scoreline consistency",    scoreline_consistency),
         ("pre-match scoreline log",  scoreline_logging),

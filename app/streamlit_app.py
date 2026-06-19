@@ -18,7 +18,8 @@ import shap
 import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-from simulate import GROUPS, Predictor, monte_carlo, simulate_group, resolve_r32
+from simulate import (GROUPS, Predictor, monte_carlo, simulate_group, resolve_r32,
+                      PRE_TOURNAMENT_CUTOFF)
 from train import ELO_BLEND_W, elo_prior_proba, make_X
 from scorelines import top_scorelines
 from explain import build_reasons
@@ -204,6 +205,12 @@ def _bootstrap_if_needed() -> None:
                 .sort_values("date")
                 .reset_index(drop=True)
             )
+            # Leakage cutoff: the live martj42 feed gains 2026 WC results during
+            # the tournament. Truncate raw data strictly before the cutoff BEFORE
+            # building features/Elo so a cold-start rebuild can never fold a
+            # tournament result into the deployed model state (features.csv,
+            # elo_ratings.csv and the trained model are all pre-tournament).
+            _df = _df[_df["date"] < PRE_TOURNAMENT_CUTOFF].reset_index(drop=True)
             feat_df, elo_df = _feat.build_features(_df)
             feat_df.to_csv(PROCESSED_DIR / "features.csv",    index=False)
             elo_df.to_csv( PROCESSED_DIR / "elo_ratings.csv", index=False)
