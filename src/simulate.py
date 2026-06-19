@@ -24,6 +24,7 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from train import ELO_BLEND_W, elo_prior_proba, make_X
+from third_place_mapping import lookup as annexe_c_lookup, check_eligibility
 
 PROCESSED_DIR = Path(__file__).resolve().parents[1] / "data" / "processed"
 MODELS_DIR    = Path(__file__).resolve().parents[1] / "models"
@@ -76,6 +77,22 @@ THIRD_ELIGIBLE: dict[int, frozenset] = {
     14: frozenset("EFGIJ"),
     15: frozenset("DEIJL"),
 }
+
+# Per-winner-slot eligible third-place groups, derived from the repo's own R32
+# constraints above: each third-place R32 tuple pairs a "1X" group winner with
+# its "3..." placeholder, and THIRD_ELIGIBLE lists that slot's eligible source
+# groups. Built once here so the official Annexe C table is validated against
+# the SAME constraints the bracket actually uses — not a second hardcoded copy.
+ELIGIBLE_THIRD_BY_WINNER: dict[str, frozenset] = {}
+for _idx, (_a, _b) in enumerate(R32_SLOTS):
+    if _idx in THIRD_ELIGIBLE:
+        _winner = _a if _a.startswith("1") else _b
+        ELIGIBLE_THIRD_BY_WINNER[_winner] = THIRD_ELIGIBLE[_idx]
+
+# Fail-fast at import: the Annexe C mapping must respect these eligibility
+# constraints for every one of its 495 rows (raises ThirdPlaceMappingError
+# otherwise). Structural/bijection validation already ran inside the data module.
+check_eligibility(ELIGIBLE_THIRD_BY_WINNER)
 
 # Round pairings: indices into the previous round's winner list
 R16_PAIRS: list[tuple[int, int]] = [(0,1),(2,3),(4,5),(6,7),(8,9),(10,11),(12,13),(14,15)]
@@ -321,37 +338,37 @@ def _table_key(record: dict) -> tuple:
 
 def resolve_r32(group_tables: dict[str, list[dict]]) -> list[tuple[str, str]]:
     """
-    Map R32 slot strings to actual team names.
-    The 8 best third-place teams are assigned to eligible slots greedily
-    (best available team fills each slot in slot-index order).
+    Map R32 slot strings to actual team names using the official FIFA World Cup
+    2026 Annexe C third-place table (src/third_place_mapping.py).
+
+    The 8 best third-place teams qualify (ranked by points -> goal-diff ->
+    goals-for, unchanged); the sorted letters of their groups form the Annexe C
+    key, and the table dictates EXACTLY which qualifying third each group winner
+    faces. There is no greedy heuristic and no fallback: an invalid or unknown
+    combination raises (annexe_c_lookup validates the 8 distinct A-L letters).
+    Group-winner (1X) and runner-up (2X) resolution is unchanged.
     """
     winners = {g: t[0]["team"] for g, t in group_tables.items()}
     runners = {g: t[1]["team"] for g, t in group_tables.items()}
     thirds  = {g: t[2]         for g, t in group_tables.items()}
 
-    # Rank all 12 third-place records; keep top 8
+    # The 8 best third-place records qualify (points -> GD -> GF).
     ranked = sorted(thirds.items(), key=lambda x: _table_key(x[1]), reverse=True)
-    qualified = {g for g, _ in ranked[:8]}
-    remaining: dict[str, str] = {g: thirds[g]["team"] for g in qualified}
+    qualified = [g for g, _ in ranked[:8]]
 
-    # Greedily assign: process slots in index order, pick best eligible remaining
-    third_fill: dict[int, str] = {}
-    for slot_idx in sorted(THIRD_ELIGIBLE):
-        eligible = THIRD_ELIGIBLE[slot_idx]
-        candidates = sorted(
-            [(g, remaining[g]) for g in eligible if g in remaining],
-            key=lambda x: _table_key(thirds[x[0]]),
-            reverse=True,
-        )
-        if candidates:
-            g, team = candidates[0]
-            third_fill[slot_idx] = team
-            del remaining[g]
+    # Official Annexe C assignment for this exact set of eight groups:
+    # {"1A": "3X", ...} mapping each winner slot to the third it faces.
+    assignment = annexe_c_lookup(qualified)
 
     def _resolve(slot: str, idx: int) -> str:
         if slot.startswith("1"):   return winners[slot[1]]
         if slot.startswith("2"):   return runners[slot[1]]
-        return third_fill.get(idx, next(iter(remaining.values()), "TBD"))
+        # Third-place placeholder: the winner it faces is the "1X" partner in
+        # this R32 tuple; Annexe C names which group's third that is.
+        a, b = R32_SLOTS[idx]
+        winner_slot = a if a.startswith("1") else b
+        third_group = assignment[winner_slot][1]
+        return thirds[third_group]["team"]
 
     return [(_resolve(a, i), _resolve(b, i)) for i, (a, b) in enumerate(R32_SLOTS)]
 
