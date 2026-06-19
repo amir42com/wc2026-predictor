@@ -23,11 +23,27 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import accuracy_score, log_loss
 
-from train import ELO_BLEND_W, make_X, train_model
+from train import ELO_BLEND_W, ELO_DRAW_RATE, elo_prior_proba, make_X, train_model
 
 PROCESSED_DIR = Path(__file__).resolve().parents[1] / "data" / "processed"
 
 BACKTEST_YEARS = [2014, 2018, 2022]
+
+
+def production_blend_prior(df_wc: pd.DataFrame) -> np.ndarray:
+    """
+    The Elo-logistic prior the DEPLOYED app blends XGB with.
+
+    Identical formula to elo_baseline_proba, but with the FIXED production
+    draw share (train.ELO_DRAW_RATE = 0.227) rather than a fold-specific draw
+    rate.  This is exactly train.elo_prior_proba / simulate.Predictor's prior,
+    so blending against it makes the backtested blend the *real* production
+    system.  (The naive Elo baseline keeps its fold-specific draw rate — only
+    the blend's prior switches.)
+    """
+    return np.vstack([elo_prior_proba(h, a, ELO_DRAW_RATE)
+                      for h, a in zip(df_wc["home_elo"].values,
+                                      df_wc["away_elo"].values)])
 
 
 def brier_multiclass(y_true: np.ndarray, proba: np.ndarray) -> float:
@@ -84,14 +100,16 @@ def backtest(df: pd.DataFrame) -> pd.DataFrame:
         X_wc, _ = make_X(df_wc, feature_cols)
         y_wc = df_wc["outcome"].values
 
-        # Baseline draw rate from the same pre-tournament window — no leakage
+        # Naive Elo baseline — draw rate from the same pre-tournament window
+        # (no leakage). This stays fold-specific.
         draw_rate = float((df_pre["outcome"] == 1).mean())
         base_proba = elo_baseline_proba(df_wc, draw_rate)
 
-        # Production model = XGB blended with the Elo prior (weight tuned on
-        # WC 2006/2010 — see notebooks/04_model_improvement.md)
+        # Production model = XGB blended with the DEPLOYED Elo prior (fixed
+        # 0.227 draw share), so the backtest scores the exact shipped system.
+        # Weight tuned on WC 2006/2010 — see notebooks/04_model_improvement.md.
         model_proba = (ELO_BLEND_W * model.predict_proba(X_wc)
-                       + (1 - ELO_BLEND_W) * base_proba)
+                       + (1 - ELO_BLEND_W) * production_blend_prior(df_wc))
 
         rows.append({"tournament": f"WC {year}", "n": len(df_wc),
                      "model": evaluate_proba(y_wc, model_proba),
