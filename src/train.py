@@ -4,9 +4,18 @@ Train an XGBoost classifier to predict match outcome (home win / draw / away win
 Reads:  data/processed/features.csv
 Writes: models/xgb_wc2026.joblib  — bundle: {model, feature_cols, label_map}
 
-Temporal split: all matches before TEST_YEAR are training data; the rest are
-held out for evaluation.  No shuffling — preserves chronological ordering to
-prevent leakage.
+Two distinct models are built here, and they must not be confused:
+  * An EVALUATION model trained on pre-TEST_YEAR data and scored on TEST_YEAR+,
+    purely to print a held-out accuracy/log-loss read-out.  No shuffling —
+    chronological order is preserved to prevent leakage.
+  * The SHIPPED model (the saved bundle), retrained on ALL available
+    pre-tournament data via production_mask() so the deployed predictor has
+    seen every match up to the eve of WC 2026 (1872 → June 2026), never just
+    the pre-2018 slice.  It is held out only from the WC 2026 fixtures it
+    predicts.
+
+(The leakage-free per-fold article backtest lives in src/backtest.py and is
+entirely separate from both of the above.)
 
 Usage:
     python src/train.py              # train + evaluate
@@ -25,7 +34,21 @@ from xgboost import XGBClassifier
 PROCESSED_DIR = Path(__file__).resolve().parents[1] / "data" / "processed"
 MODELS_DIR = Path(__file__).resolve().parents[1] / "models"
 
-TEST_YEAR = 2018
+TEST_YEAR = 2018   # eval-only split boundary (held-out read-out, NOT the shipped model)
+
+
+def production_mask(df: pd.DataFrame) -> pd.Series:
+    """
+    Rows the SHIPPED model trains on: all pre-tournament data.
+
+    Includes every match up to the eve of WC 2026 (friendlies, qualifiers,
+    continental cups — all legitimate pre-tournament form) and excludes ONLY
+    the WC 2026 tournament fixtures we are predicting.  is_world_cup flags
+    World Cup matches and 2026 is the only future World Cup, so dropping WC
+    matches dated 2026+ holds out exactly that tournament while keeping the
+    full build-up.
+    """
+    return ~((df["is_world_cup"] == 1) & (df["date"].dt.year >= 2026))
 
 # Columns fed to the model — order is fixed for inference alignment
 NUMERIC_COLS = [
@@ -244,12 +267,20 @@ def main() -> None:
     print(f"  Train: {len(df_train):,} matches (before {TEST_YEAR})")
     print(f"  Test:  {len(df_test):,} matches  ({TEST_YEAR}+)\n")
 
-    print("Training ...")
-    model, feature_cols = train_model(df_train)
+    print("Training evaluation model (pre-2018 only) ...")
+    eval_model, feature_cols = train_model(df_train)
     print(f"  {len(feature_cols)} input features\n")
 
     print(f"Evaluation on held-out test set ({TEST_YEAR}+):")
-    evaluate(model, df_test, feature_cols)
+    evaluate(eval_model, df_test, feature_cols)
+
+    # Shipped model: retrain on ALL pre-tournament data so the deployed
+    # predictor has seen 2018–2026, not just the pre-2018 eval slice.
+    df_prod = df[production_mask(df)].reset_index(drop=True)
+    n_excluded = len(df) - len(df_prod)
+    print(f"\nTraining FINAL production model on all pre-tournament data ...")
+    print(f"  {len(df_prod):,} matches (excludes {n_excluded} WC 2026 fixture(s))")
+    model, feature_cols = train_model(df_prod)
 
     bundle = {"model": model, "feature_cols": feature_cols, "label_map": LABEL_MAP}
     out = MODELS_DIR / "xgb_wc2026.joblib"
@@ -258,7 +289,7 @@ def main() -> None:
     size_mb = out.stat().st_size / 1e6
     print(f"\nModel saved -> {out}  ({size_mb:.1f} MB)")
 
-    print("\nTop 15 features by importance:")
+    print("\nTop 15 features by importance (shipped model):")
     imp = pd.Series(model.feature_importances_, index=feature_cols).nlargest(15)
     for feat, score in imp.items():
         bar = "#" * int(score * 400)
