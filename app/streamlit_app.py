@@ -213,8 +213,10 @@ def _bootstrap_if_needed() -> None:
             st.write("Training XGBoost model (~30 seconds)…")
             MODELS_DIR.mkdir(parents=True, exist_ok=True)
             _df2 = pd.read_csv(PROCESSED_DIR / "features.csv", parse_dates=["date"])
-            mask  = _df2["date"].dt.year < _tr.TEST_YEAR
-            model, feature_cols = _tr.train_model(_df2[mask].reset_index(drop=True))
+            # Ship a model trained on ALL pre-tournament data (1872–2026), not
+            # the pre-2018 eval slice — same logic as src/train.py main().
+            model, feature_cols = _tr.train_model(
+                _df2[_tr.production_mask(_df2)].reset_index(drop=True))
             _bundle = {
                 "model":        model,
                 "feature_cols": feature_cols,
