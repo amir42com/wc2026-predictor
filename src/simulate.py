@@ -237,7 +237,8 @@ def simulate_group(
 ) -> list[dict]:
     """
     Simulate a 4-team round-robin.  Returns standings sorted by:
-    points → goal-diff → goals-for → random shuffle for any remaining ties.
+    points → goal-diff → goals-for → head-to-head (points, then goal-diff)
+    → random shuffle, applied ONLY to teams still tied after head-to-head.
     Each record: {team, pts, gd, gf, h2h_pts, h2h_gd, group}.
     """
     rec = {t: {"team": t, "pts": 0, "gd": 0, "gf": 0} for t in teams}
@@ -280,12 +281,32 @@ def simulate_group(
         cluster = standings[i:j]
         if len(cluster) > 1:
             cluster_teams = [r["team"] for r in cluster]
-            cluster.sort(
-                key=lambda r: sum(h2h_pts[r["team"]][o] for o in cluster_teams if o != r["team"]),
-                reverse=True,
-            )
-            # If still fully tied on H2H pts, shuffle randomly
-            rng.shuffle(cluster)
+
+            def h2h_key(r: dict) -> tuple[int, int]:
+                # Mini-table among the tied teams only: H2H points, then H2H GD.
+                others = [o for o in cluster_teams if o != r["team"]]
+                return (sum(h2h_pts[r["team"]][o] for o in others),
+                        sum(h2h_gd[r["team"]][o] for o in others))
+
+            cluster.sort(key=h2h_key, reverse=True)
+
+            # Random tiebreak ONLY within sub-groups that are STILL tied after
+            # head-to-head — never reshuffle the whole cluster (that would undo
+            # the H2H ordering). Shuffling each tied run independently keeps the
+            # H2H ranking between runs and stays deterministic given the rng.
+            resolved: list[dict] = []
+            k = 0
+            while k < len(cluster):
+                m = k + 1
+                while m < len(cluster) and h2h_key(cluster[m]) == h2h_key(cluster[k]):
+                    m += 1
+                tied = cluster[k:m]
+                if len(tied) > 1:
+                    rng.shuffle(tied)
+                resolved.extend(tied)
+                k = m
+            cluster = resolved
+
         final.extend(cluster)
         i = j
 
