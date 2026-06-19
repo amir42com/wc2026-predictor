@@ -191,12 +191,31 @@ def score_matches(raw_matches: list[dict], predictor: Predictor) -> list[dict]:
         if not home or not away:
             continue
 
-        ft = m["score"]["fullTime"]
+        score = m["score"]
+        ft = score["fullTime"]
         hs, as_ = ft.get("home"), ft.get("away")
         if hs is None or as_ is None:
             continue
 
-        actual = 0 if hs > as_ else (1 if hs == as_ else 2)
+        # Align the recorded result with the model's TRAINING TARGET: the score
+        # after extra time, EXCLUDING penalty shootouts (the martj42 results.csv
+        # convention — a shootout knockout is a draw, the shootout lives in
+        # shootouts.csv). football-data.org v4 `fullTime` already INCLUDES
+        # extra-time goals (verified: England 2-1 Slovakia = regularTime 1-1 +
+        # extraTime 1-0), so extra-time knockouts need no adjustment. But for a
+        # shootout, `fullTime` also folds in the penalty tally (verified:
+        # Portugal-Slovenia 0-0 after ET, won 3-0 on pens, `fullTime` = 3-0 with
+        # `penalties` = 3-0). Strip the shootout so the match is recorded as the
+        # after-ET draw it actually was. Group-stage games are always REGULAR,
+        # so this only ever affects knockout fixtures.
+        duration = score.get("duration")
+        if duration == "PENALTY_SHOOTOUT":
+            pen = score.get("penalties") or {}
+            hs = hs - (pen.get("home") or 0)
+            as_ = as_ - (pen.get("away") or 0)
+            actual = 1  # draw — shootouts excluded from the target
+        else:
+            actual = 0 if hs > as_ else (1 if hs == as_ else 2)
 
         # Pre-tournament, neutral-venue probabilities (p_home, p_draw, p_away)
         if home in predictor._state and away in predictor._state:
@@ -216,9 +235,10 @@ def score_matches(raw_matches: list[dict], predictor: Predictor) -> list[dict]:
             "utc":        m["utcDate"],
             "home_team":  home,
             "away_team":  away,
-            "home_score": int(hs),
+            "home_score": int(hs),     # after extra time, shootout stripped
             "away_score": int(as_),
-            "winner":     m["score"].get("winner"),
+            "winner":     score.get("winner"),   # API winner (e.g. shootout winner)
+            "duration":   duration,              # REGULAR / EXTRA_TIME / PENALTY_SHOOTOUT
             "actual_outcome":    actual,
             "predicted_outcome": predicted,
             "p_home": None if np.isnan(p[0]) else round(float(p[0]), 4),
