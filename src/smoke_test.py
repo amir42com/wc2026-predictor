@@ -183,6 +183,22 @@ def main() -> int:
                     f"reason side != sign for {home}-{away}: {r['group']}"
         print("(group sums == total SHAP, additive, signs consistent) ", end="")
 
+    def annexe_c_mapping():
+        # Official FIFA 2026 Annexe C third-place table loads & validates, a
+        # known combination resolves, and the eligibility cross-check against
+        # the simulator's R32 constraints passes (exhaustive 495-row coverage
+        # lives in tests/test_third_place_mapping.py).
+        import third_place_mapping as tpm
+        from simulate import ELIGIBLE_THIRD_BY_WINNER
+
+        assert tpm.validate_structure() is True, "structural validation failed"
+        assert len(tpm.THIRD_PLACE_MAPPING) == 495, "expected 495 rows"
+        row = tpm.lookup(list("ABCDEFGH"))
+        assert row["1A"] == "3H" and row["1L"] == "3E", f"bad row {row}"
+        fails = tpm.check_eligibility(ELIGIBLE_THIRD_BY_WINNER, raise_on_fail=False)
+        assert fails == [], f"{len(fails)} eligibility failures"
+        print("(495 rows valid, ABCDEFGH resolves, eligibility ok) ", end="")
+
     steps = [
         ("load model bundle",        load_bundle),
         ("build Predictor",          load_predictor),
@@ -191,6 +207,7 @@ def main() -> int:
         ("pre-match scoreline log",  scoreline_logging),
         ("next-fixture selection",   next_fixture_selection),
         ("SHAP grouping reconcile",  grouping_reconciliation),
+        ("Annexe C third-place map", annexe_c_mapping),
         ("100-sim Monte Carlo",      run_monte_carlo),
     ]
 
