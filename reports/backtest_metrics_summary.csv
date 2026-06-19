@@ -1,15 +1,15 @@
 tournament,model,n,accuracy,log_loss,brier,statistic,value,detail
-WC 2014,Raw XGBoost,64,0.578125,0.919305,0.543237,,,
-WC 2014,Blend,64,0.578125,0.918780,0.542756,,,
+WC 2014,Raw XGBoost,64,0.609375,0.918165,0.541073,,,
+WC 2014,Blend,64,0.609375,0.920663,0.542548,,,
 WC 2014,Elo,64,0.609375,0.938830,0.555480,,,
-WC 2018,Raw XGBoost,64,0.531250,0.978528,0.582471,,,
-WC 2018,Blend,64,0.562500,0.966293,0.574814,,,
+WC 2018,Raw XGBoost,64,0.546875,0.962694,0.569676,,,
+WC 2018,Blend,64,0.546875,0.954941,0.565921,,,
 WC 2018,Elo,64,0.578125,0.950053,0.564498,,,
-WC 2022,Raw XGBoost,64,0.515625,1.071249,0.632135,,,
-WC 2022,Blend,64,0.515625,1.057756,0.623566,,,
+WC 2022,Raw XGBoost,64,0.531250,1.047861,0.616569,,,
+WC 2022,Blend,64,0.531250,1.040508,0.612005,,,
 WC 2022,Elo,64,0.546875,1.041799,0.611098,,,
-Combined,Raw XGBoost,192,0.541667,0.989694,0.585948,,,
-Combined,Blend,192,0.552083,0.980943,0.580379,,,
+Combined,Raw XGBoost,192,0.562500,0.976240,0.575773,,,
+Combined,Blend,192,0.562500,0.972037,0.573491,,,
 Combined,Elo,192,0.578125,0.976894,0.577025,,,
-Paired test (192),McNemar exact (Blend vs Elo),192,,,,p_value,0.301758,"b=5 (blend-only correct), c=10 (elo-only correct), discordant=15"
-Paired test (192),Bootstrap logloss diff (Blend-Elo),192,,,,mean_diff,0.004049,"95% CI [-0.0195, 0.0289], 10000 resamples, seed 12345"
+Paired test (192),McNemar exact (Blend vs Elo),192,,,,p_value,0.581055,"b=5 (blend-only correct), c=8 (elo-only correct), discordant=13"
+Paired test (192),Bootstrap logloss diff (Blend-Elo),192,,,,mean_diff,-0.004857,"95% CI [-0.0259, 0.0175], 10000 resamples, seed 12345"

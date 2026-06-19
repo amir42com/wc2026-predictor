@@ -38,11 +38,15 @@ PROCESSED_DIR = Path(__file__).resolve().parents[1] / "data" / "processed"
 REPORTS_DIR = Path(__file__).resolve().parents[1] / "reports"
 
 # Article headline numbers (combined, 192 matches) for reconciliation.
-# (accuracy fraction, log-loss, multiclass Brier)
+# (accuracy fraction, log-loss, multiclass Brier). These reflect the DEPLOYED
+# inference: the model output is symmetry-averaged over both home/away orderings
+# before the Elo blend (so "Raw XGBoost" here is that averaged output). Earlier
+# single-orientation figures were blend 0.552/0.9809/0.5804, xgb 0.542/0.9897/
+# 0.5859; symmetry-averaging lifted accuracy and lowered log-loss/Brier.
 ARTICLE_COMBINED = {
-    "xgb":   (0.542, 0.9897, 0.5859),
-    "blend": (0.552, 0.9809, 0.5804),
-    "elo":   (0.578, 0.9769, 0.5770),
+    "xgb":   (0.5625, 0.9762, 0.5758),
+    "blend": (0.5625, 0.9720, 0.5735),
+    "elo":   (0.5781, 0.9769, 0.5770),
 }
 RECONCILE_TOL = {"acc": 0.005, "ll": 0.0005, "brier": 0.0005}
 
