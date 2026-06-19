@@ -17,6 +17,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from team_names import canonical
+
 RAW_DIR = Path(__file__).resolve().parents[1] / "data" / "raw"
 PROCESSED_DIR = Path(__file__).resolve().parents[1] / "data" / "processed"
 
@@ -44,7 +46,7 @@ CONFEDERATION: dict[str, str] = {
     **dict.fromkeys([
         "United States", "Mexico", "Canada", "Costa Rica", "Honduras",
         "Jamaica", "Panama", "Trinidad and Tobago", "El Salvador",
-        "Guatemala", "Haiti", "Cuba", "Curacao", "Bermuda", "Barbados",
+        "Guatemala", "Haiti", "Cuba", "Curaçao", "Bermuda", "Barbados",
         "Nicaragua", "Belize", "Dominican Republic", "Guyana", "Suriname",
     ], "CONCACAF"),
     **dict.fromkeys([
@@ -76,7 +78,9 @@ CONFEDERATION: dict[str, str] = {
 
 
 def _conf(team: str) -> str:
-    return CONFEDERATION.get(team, "Other")
+    # Normalize aliases/accents first so e.g. "Curacao" and "Curaçao" both land
+    # in CONCACAF rather than falling through to "Other".
+    return CONFEDERATION.get(canonical(team), "Other")
 
 
 def _elo_expected(ra: float, rb: float) -> float:
