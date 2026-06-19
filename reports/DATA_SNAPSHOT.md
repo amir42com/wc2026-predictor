@@ -7,8 +7,9 @@ value below will reproduce the same 192-match backtest exactly.
 
 ## Source dataset (`data/raw/results.csv`)
 
-International football results, downloaded from Kaggle
-(`martj42/international-football-results-1872-to-2017`) via `src/fetch_data.py`.
+International football results, downloaded from GitHub
+(`martj42/international_results`, `master` branch — fetched directly from
+`raw.githubusercontent.com`) via `src/fetch_data.py`.
 
 | Field | Value |
 | --- | --- |
