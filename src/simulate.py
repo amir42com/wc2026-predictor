@@ -23,7 +23,7 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from train import ELO_BLEND_W, elo_prior_proba, make_X
+from train import ELO_BLEND_W, elo_prior_proba, make_X, predict_neutral_proba
 from third_place_mapping import lookup as annexe_c_lookup, check_eligibility
 
 PROCESSED_DIR = Path(__file__).resolve().parents[1] / "data" / "processed"
@@ -246,17 +246,13 @@ class Predictor:
         """
         key = frozenset({team_a, team_b})
         if key not in self._cache:
-            a, b   = sorted([team_a, team_b])
-            p_ab   = self._raw_proba(a, b)
-            p_ba   = self._raw_proba(b, a)
-            # Average both orderings to cancel any residual home-field asymmetry
-            p_model = (p_ab + p_ba[[2, 1, 0]]) / 2  # (a_win, draw, b_win)
-            # Shrink toward the Elo-logistic prior (improves WC calibration)
+            a, b = sorted([team_a, team_b])
             elo_a = self._state.get(a, self._default_state())["elo"]
             elo_b = self._state.get(b, self._default_state())["elo"]
-            prior = elo_prior_proba(elo_a, elo_b)
-            blended = ELO_BLEND_W * p_model + (1 - ELO_BLEND_W) * prior
-            self._cache[key] = blended / blended.sum()
+            # Shared deployed inference: symmetry-average both orderings, then
+            # blend toward the Elo-logistic prior. build_x = feature_X.
+            self._cache[key] = predict_neutral_proba(
+                self._model, self.feature_X, a, b, elo_a, elo_b)
 
         p = self._cache[key]
         a = min(team_a, team_b)

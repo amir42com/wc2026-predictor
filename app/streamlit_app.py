@@ -937,10 +937,17 @@ if page == "Match Predictor":
         "home_confederation": hs["confederation"],
         "away_confederation": as_["confederation"],
     }
-    X, _ = make_X(pd.DataFrame([feat_row]), bundle["feature_cols"])
-    proba = bundle["model"].predict_proba(X)[0]   # [p_home_win, p_draw, p_away_win]
-    # Production blend: shrink toward the Elo-logistic prior (same as simulator)
-    proba = ELO_BLEND_W * proba + (1 - ELO_BLEND_W) * elo_prior_proba(hs["elo"], as_["elo"])
+    X, _ = make_X(pd.DataFrame([feat_row]), bundle["feature_cols"])   # for SHAP (home orientation)
+    if neutral:
+        # Neutral World Cup match: use the EXACT shared deployed inference
+        # (symmetry-averaged + Elo-blended) so this page agrees with the
+        # simulator and tracker to the digit. Oriented home_team -> away_team.
+        proba = predictor.predict(home_team, away_team)
+    else:
+        # Home-advantage mode (user turned neutral off): single orientation,
+        # then the same Elo blend — averaging would cancel the home edge.
+        proba = bundle["model"].predict_proba(X)[0]   # [p_home_win, p_draw, p_away_win]
+        proba = ELO_BLEND_W * proba + (1 - ELO_BLEND_W) * elo_prior_proba(hs["elo"], as_["elo"])
     predicted_class = int(proba.argmax())
     outcome_labels  = [f"{home_team} Win", "Draw", f"{away_team} Win"]
 
