@@ -236,9 +236,6 @@ class Predictor:
         X, _ = make_X(pd.DataFrame([row]), self._feature_cols)
         return X
 
-    def _raw_proba(self, home: str, away: str) -> np.ndarray:
-        return self._model.predict_proba(self.feature_X(home, away))[0]
-
     def predict(self, team_a: str, team_b: str) -> np.ndarray:
         """
         Return (p_a_win, p_draw, p_b_win). Cached, symmetry-corrected.
