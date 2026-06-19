@@ -211,9 +211,11 @@ def _bootstrap_if_needed() -> None:
             # tournament result into the deployed model state (features.csv,
             # elo_ratings.csv and the trained model are all pre-tournament).
             _df = _df[_df["date"] < PRE_TOURNAMENT_CUTOFF].reset_index(drop=True)
-            feat_df, elo_df = _feat.build_features(_df)
-            feat_df.to_csv(PROCESSED_DIR / "features.csv",    index=False)
-            elo_df.to_csv( PROCESSED_DIR / "elo_ratings.csv", index=False)
+            feat_df, elo_df, state_df = _feat.build_features(
+                _df, state_cutoff=PRE_TOURNAMENT_CUTOFF)
+            feat_df.to_csv( PROCESSED_DIR / "features.csv",    index=False)
+            elo_df.to_csv(  PROCESSED_DIR / "elo_ratings.csv", index=False)
+            state_df.to_csv(PROCESSED_DIR / "team_state.csv",  index=False)
             st.write(f"Features built: {len(feat_df):,} matches.")
 
         if missing_model:
