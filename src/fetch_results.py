@@ -33,6 +33,7 @@ import requests
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from simulate import Predictor  # noqa: E402
 from scorelines import top_scorelines  # noqa: E402
+from team_names import ALIASES as TEAM_NAME_MAP, canonical  # noqa: E402
 
 ROOT          = Path(__file__).resolve().parents[1]
 PROCESSED_DIR = ROOT / "data" / "processed"
@@ -41,17 +42,9 @@ RESULTS_PATH  = ROOT / "data" / "wc2026_results.json"
 
 API_URL = "https://api.football-data.org/v4/competitions/WC/matches"
 
-# football-data.org team names -> our model's team keys
-TEAM_NAME_MAP: dict[str, str] = {
-    "Bosnia-Herzegovina": "Bosnia and Herzegovina",
-    "Cape Verde Islands": "Cape Verde",
-    "Congo DR":           "DR Congo",
-    "Czechia":            "Czech Republic",
-    "IR Iran":            "Iran",
-    "Korea Republic":     "South Korea",
-    "Republic of Korea":  "South Korea",
-    "USA":                "United States",
-}
+# football-data.org team names -> our model's team keys are now normalized via
+# the central canonical map (src/team_names.py); TEAM_NAME_MAP is re-exported
+# from there for back-compat.
 
 
 def get_api_key() -> str | None:
@@ -79,9 +72,7 @@ def get_api_key() -> str | None:
 
 
 def map_team(name: str | None) -> str | None:
-    if name is None:
-        return None
-    return TEAM_NAME_MAP.get(name, name)
+    return canonical(name)
 
 
 def load_predictor() -> Predictor:
@@ -249,7 +240,8 @@ def score_matches(raw_matches: list[dict], predictor: Predictor) -> list[dict]:
         })
 
     if unmapped:
-        print(f"  WARNING: no model state for {sorted(unmapped)} — add to TEAM_NAME_MAP")
+        print(f"  WARNING: no model state for {sorted(unmapped)} — add an alias to "
+              f"src/team_names.py (ALIASES)")
 
     out.sort(key=lambda r: r["utc"], reverse=True)  # newest first
     return out
