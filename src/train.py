@@ -62,11 +62,19 @@ NUMERIC_COLS = [
 
 LABEL_MAP = {0: "Home win", 1: "Draw", 2: "Away win"}
 
-WC_BACKTEST_YEARS = [2010, 2014, 2018, 2022]
+# Matches the canonical article/eval window (src/backtest.py, experiments.py).
+# This is the quick `--backtest` sanity table only; the 2010 fold was dropped
+# so it no longer disagrees with the 192-match (2014/2018/2022) backtest.
+WC_BACKTEST_YEARS = [2014, 2018, 2022]
 
 # Production ensemble: blend XGB probabilities with an Elo-logistic prior.
-# Beats both raw XGB and the naive Elo baseline on WC log-loss/Brier; weight
-# tuned on WC 2006/2010 only (see notebooks/04_model_improvement.md).
+# Honest finding from the clean walk-forward rerun (see
+# notebooks/04_model_improvement.md): the blend IMPROVES on raw XGB
+# (log-loss/Brier) but does NOT beat the naive Elo baseline — Elo is in fact
+# better on all three metrics, and the blend-vs-Elo gap is within noise
+# (McNemar p≈0.30, bootstrap log-loss CI straddles 0). The blend ships for its
+# better calibration over raw XGB, not as a claimed win over Elo. Weight tuned
+# on WC 2006/2010 only.
 ELO_BLEND_W   = 0.75   # XGB share of the blend
 ELO_DRAW_RATE = 0.227  # historical draw share used by the prior
 
