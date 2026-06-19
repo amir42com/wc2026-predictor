@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "WC 2026 Predictor: an XGBoost + Elo ensemble for World Cup match forecasting"
+authors:
+  - family-names: Mohammadi
+    given-names: Amir
+version: "2.0"
+date-released: 2026-06-18
+url: "https://github.com/amir42com/wc2026-predictor"
+license: MIT
