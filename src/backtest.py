@@ -23,11 +23,63 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import accuracy_score, log_loss
 
-from train import ELO_BLEND_W, ELO_DRAW_RATE, elo_prior_proba, make_X, train_model
+from train import (ELO_BLEND_W, ELO_DRAW_RATE, elo_prior_proba, make_X,
+                   predict_neutral_proba, train_model)
 
 PROCESSED_DIR = Path(__file__).resolve().parents[1] / "data" / "processed"
 
 BACKTEST_YEARS = [2014, 2018, 2022]
+
+
+def _swap_orientation(d: dict) -> dict:
+    """
+    A recorded feature row with home/away roles swapped, for symmetry averaging.
+    Mirrors what deployment's feature_X produces for the reversed ordering: swap
+    the paired home_/away_ features, negate elo_diff, and set h2h_home_wr to the
+    new home's (old away's) head-to-head win share.
+    """
+    s = dict(d)
+    for x, y in [("home_elo", "away_elo"),
+                 ("home_win_rate_5", "away_win_rate_5"),
+                 ("home_gd_5", "away_gd_5"),
+                 ("home_win_rate_10", "away_win_rate_10"),
+                 ("home_gd_10", "away_gd_10"),
+                 ("home_conf_elo", "away_conf_elo"),
+                 ("home_confederation", "away_confederation")]:
+        s[x], s[y] = d[y], d[x]
+    s["elo_diff"] = -d["elo_diff"]
+    n = d.get("h2h_n", 0) or 0
+    if n:
+        s["h2h_home_wr"] = (d.get("h2h_away_wins", 0) or 0) / n
+    return s
+
+
+def deployed_model_and_blend(model, df_wc: pd.DataFrame,
+                             feature_cols: list) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Run the EXACT deployed inference (train.predict_neutral_proba) on each
+    recorded WC match: symmetry-average both orderings of the model, then blend
+    with the fixed-0.227 Elo prior. Returns (model_avg, blend) — model_avg is the
+    symmetry-averaged model output BEFORE the blend (blend_weight=1.0).
+    """
+    model_avg, blend = [], []
+    for i in range(len(df_wc)):
+        row = df_wc.iloc[i].to_dict()
+        rev = _swap_orientation(row)
+        home0 = row["home_team"]
+
+        def build_x(home, away, _row=row, _rev=rev, _home0=home0):
+            d = _row if home == _home0 else _rev
+            X, _ = make_X(pd.DataFrame([d]), feature_cols)
+            return X
+
+        ea, eb = row["home_elo"], row["away_elo"]
+        model_avg.append(predict_neutral_proba(
+            model, build_x, row["home_team"], row["away_team"], ea, eb,
+            blend_weight=1.0))
+        blend.append(predict_neutral_proba(
+            model, build_x, row["home_team"], row["away_team"], ea, eb))
+    return np.vstack(model_avg), np.vstack(blend)
 
 
 def production_blend_prior(df_wc: pd.DataFrame) -> np.ndarray:
@@ -97,7 +149,6 @@ def backtest(df: pd.DataFrame) -> pd.DataFrame:
 
         model, feature_cols = train_model(df_pre)
 
-        X_wc, _ = make_X(df_wc, feature_cols)
         y_wc = df_wc["outcome"].values
 
         # Naive Elo baseline — draw rate from the same pre-tournament window
@@ -105,11 +156,10 @@ def backtest(df: pd.DataFrame) -> pd.DataFrame:
         draw_rate = float((df_pre["outcome"] == 1).mean())
         base_proba = elo_baseline_proba(df_wc, draw_rate)
 
-        # Production model = XGB blended with the DEPLOYED Elo prior (fixed
-        # 0.227 draw share), so the backtest scores the exact shipped system.
-        # Weight tuned on WC 2006/2010 — see notebooks/04_model_improvement.md.
-        model_proba = (ELO_BLEND_W * model.predict_proba(X_wc)
-                       + (1 - ELO_BLEND_W) * production_blend_prior(df_wc))
+        # Production model = the EXACT deployed inference: symmetry-average both
+        # orderings, then blend with the fixed-0.227 Elo prior. Matches the app,
+        # tracker and simulator (train.predict_neutral_proba).
+        _, model_proba = deployed_model_and_blend(model, df_wc, feature_cols)
 
         rows.append({"tournament": f"WC {year}", "n": len(df_wc),
                      "model": evaluate_proba(y_wc, model_proba),

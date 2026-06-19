@@ -30,9 +30,9 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import accuracy_score, log_loss
 
-from train import ELO_BLEND_W, make_X, train_model
+from train import make_X, train_model
 from backtest import (BACKTEST_YEARS, brier_multiclass, elo_baseline_proba,
-                      production_blend_prior)
+                      deployed_model_and_blend)
 
 PROCESSED_DIR = Path(__file__).resolve().parents[1] / "data" / "processed"
 REPORTS_DIR = Path(__file__).resolve().parents[1] / "reports"
@@ -64,18 +64,16 @@ def _fold_predictions(df: pd.DataFrame) -> list[dict]:
 
         model, feature_cols = train_model(df_pre)
 
-        X_wc, _ = make_X(df_wc, feature_cols)
         y_wc = df_wc["outcome"].values
 
-        # Raw XGB (before the Elo blend)
-        xgb_proba = model.predict_proba(X_wc)
-        # Naive Elo baseline — fold-specific draw rate (no leakage)
+        # Deployed inference (identical to backtest.py / the app): the model
+        # output is symmetry-averaged over both orderings, then blended with the
+        # fixed-0.227 Elo prior. "Raw XGBoost" here is that symmetry-averaged
+        # model output BEFORE the blend.
+        xgb_proba, blend_proba = deployed_model_and_blend(model, df_wc, feature_cols)
+        # Naive Elo baseline — fold-specific draw rate (no leakage), unchanged.
         draw_rate = float((df_pre["outcome"] == 1).mean())
         elo_proba = elo_baseline_proba(df_wc, draw_rate)
-        # Production blend (identical to backtest.py): XGB + the DEPLOYED Elo
-        # prior (fixed 0.227 draw share), NOT the fold-specific baseline.
-        blend_proba = (ELO_BLEND_W * xgb_proba
-                       + (1 - ELO_BLEND_W) * production_blend_prior(df_wc))
 
         folds.append({
             "tournament": f"WC {year}",

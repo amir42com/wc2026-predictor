@@ -87,6 +87,35 @@ def elo_prior_proba(elo_home: float, elo_away: float,
     return p / p.sum()
 
 
+def predict_neutral_proba(model, build_x, team_a: str, team_b: str,
+                          elo_a: float, elo_b: float,
+                          blend_weight: float = ELO_BLEND_W,
+                          draw_rate: float = ELO_DRAW_RATE) -> np.ndarray:
+    """
+    THE single deployed neutral-venue inference, shared by the Streamlit
+    predictor, the tracker, the simulator and the backtest so all evaluate the
+    exact same procedure.
+
+    `build_x(home, away)` is supplied by the caller and returns a single-row
+    feature matrix aligned to the model's feature columns (the caller owns X
+    construction — team-state reconstruction for serving, recorded-row
+    re-orientation for the backtest). The steps:
+
+      1. predict_proba for A-vs-B and B-vs-A,
+      2. reverse the second vector ([2,1,0]) back to A's perspective,
+      3. average the two (cancels the model's residual home/away asymmetry),
+      4. shrink toward the Elo-logistic prior at `blend_weight`.
+
+    Returns P(team_a win, draw, team_b win), summing to 1.
+    """
+    p_ab = model.predict_proba(build_x(team_a, team_b))[0]
+    p_ba = model.predict_proba(build_x(team_b, team_a))[0]
+    p_model = (p_ab + p_ba[[2, 1, 0]]) / 2.0
+    prior = elo_prior_proba(elo_a, elo_b, draw_rate)
+    blended = blend_weight * p_model + (1.0 - blend_weight) * prior
+    return blended / blended.sum()
+
+
 def make_X(df: pd.DataFrame, feature_cols: list[str] | None = None) -> tuple[pd.DataFrame, list[str]]:
     """
     Build the model-ready feature matrix.
