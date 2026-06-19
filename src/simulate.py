@@ -124,63 +124,59 @@ class Predictor:
     """
 
     def __init__(self, features_path: Path, elo_path: Path, bundle: dict,
-                 cutoff: "pd.Timestamp | None" = PRE_TOURNAMENT_CUTOFF) -> None:
+                 cutoff: "pd.Timestamp | None" = PRE_TOURNAMENT_CUTOFF,
+                 state_path: "Path | None" = None) -> None:
         self._model        = bundle["model"]
         self._feature_cols = bundle["feature_cols"]
+        state_path = state_path or features_path.parent / "team_state.csv"
 
-        df     = pd.read_csv(features_path, parse_dates=["date"]).sort_values("date")
-        elo_df = pd.read_csv(elo_path).set_index("team")
+        df = pd.read_csv(features_path, parse_dates=["date"]).sort_values("date")
 
-        # Leakage guard: hard-cap the team state at the pre-tournament cutoff.
-        # Even if features.csv was rebuilt mid-tournament from the live feed, the
-        # state used to serve predictions only ever sees matches strictly before
-        # the cutoff. (The Elo override below comes from elo_ratings.csv, which
-        # the serving bootstrap likewise rebuilds from pre-cutoff raw data.)
+        # Leakage guard on the H2H source: hard-cap features at the pre-tournament
+        # cutoff so a rebuilt features.csv can't fold tournament matches into H2H.
         if cutoff is not None:
             n_leaked = int((df["date"] >= cutoff).sum())
             if n_leaked:
-                # Loud signal: the source carried tournament-dated matches. We
-                # drop them so leaked results can never reach a prediction.
                 print(f"  WARNING: features source has {n_leaked} match(es) dated "
-                      f">= {cutoff.date()}; dropping them from model state "
-                      f"(leakage prevented).")
+                      f">= {cutoff.date()}; dropping them (leakage prevented).")
             df = df[df["date"] < cutoff].reset_index(drop=True)
             if df.empty:
                 raise RuntimeError(
                     f"Predictor: no matches strictly before {cutoff.date()} in "
-                    f"{features_path} — refusing to serve (cannot build "
-                    f"pre-tournament team state).")
-            max_date = df["date"].max()
-            # Invariant after truncation: the state never includes the cutoff or later.
-            assert max_date < cutoff, f"leak guard failed: {max_date} >= {cutoff}"
-            self._state_max_date = max_date
+                    f"{features_path} — refusing to serve.")
+
+        # Serving team state: the POST-final-match snapshot (team_state.csv), so
+        # recent-form features include each team's LAST pre-tournament match
+        # rather than the one-behind value in their last pre-match feature row.
+        ts = pd.read_csv(state_path, parse_dates=["last_match_date"])
+        if cutoff is not None:
+            leaked = ts[ts["last_match_date"] >= cutoff]
+            if len(leaked):
+                # A per-team snapshot can't be repaired by dropping rows (it would
+                # silently degrade real teams to defaults), so a leaked snapshot
+                # means the file was built without the cutoff — refuse to serve.
+                raise RuntimeError(
+                    f"Predictor: team_state.csv has {len(leaked)} team(s) whose last "
+                    f"match is >= {cutoff.date()} ({sorted(leaked['team'])[:5]}…); "
+                    f"rebuild features with the cutoff. Refusing to serve.")
+        self._state_max_date = ts["last_match_date"].max()
+        if cutoff is not None:
+            assert self._state_max_date < cutoff, "leak guard failed"
             print(f"  Predictor state capped at < {cutoff.date()} "
-                  f"(latest match {max_date.date()})")
-        else:
-            self._state_max_date = df["date"].max() if len(df) else None
+                  f"(latest match {self._state_max_date.date()})")
         self._cutoff = cutoff
 
-        # Latest pre-match state for each team (last row they appeared in)
         state: dict[str, dict] = {}
-        for _, row in df.iterrows():
-            for side in ("home", "away"):
-                t = row[f"{side}_team"]
-                state[t] = {
-                    "win_rate_5":     row[f"{side}_win_rate_5"],
-                    "gd_5":           row[f"{side}_gd_5"],
-                    "win_rate_10":    row[f"{side}_win_rate_10"],
-                    "gd_10":          row[f"{side}_gd_10"],
-                    "confederation":  row[f"{side}_confederation"],
-                    "conf_elo":       row[f"{side}_conf_elo"],
-                    "elo":            row[f"{side}_elo"],
-                }
-
-        # Override Elo with post-match final ratings
-        for t in state:
-            if t in elo_df.index:
-                state[t]["elo"]           = float(elo_df.at[t, "elo"])
-                state[t]["confederation"] = str(elo_df.at[t, "confederation"])
-
+        for _, r in ts.iterrows():
+            state[r["team"]] = {
+                "elo":           float(r["elo"]),
+                "win_rate_5":    float(r["win_rate_5"]),
+                "gd_5":          float(r["gd_5"]),
+                "win_rate_10":   float(r["win_rate_10"]),
+                "gd_10":         float(r["gd_10"]),
+                "confederation": str(r["confederation"]),
+                "conf_elo":      float(r["conf_elo"]),
+            }
         self._state = state
 
         # H2H history: frozenset({a,b}) → list of (home_team, outcome) last 10

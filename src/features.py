@@ -99,10 +99,19 @@ def _form_stats(recent: list[tuple[float, float]]) -> tuple[float, float]:
     )
 
 
-def build_features(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+def build_features(df: pd.DataFrame,
+                   state_cutoff: "pd.Timestamp | None" = None
+                   ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
     Walk matches chronologically, snapshot pre-match features, append a row,
-    then update state. Returns (feature_df, elo_df).
+    then update state. Returns (feature_df, elo_df, team_state_df).
+
+    feature_df rows hold PRE-match features (the training/backtest target — its
+    column DEFINITIONS are unchanged). team_state_df is the SERVING snapshot:
+    each team's state AFTER its last observed match (post-match form + Elo +
+    conf_elo), so the live Predictor isn't one match stale. When `state_cutoff`
+    is given, only matches strictly before it contribute to team_state_df (the
+    serving leakage cutoff); feature_df is unaffected.
     """
     elo: dict[str, float] = defaultdict(lambda: ELO_BASE)
     form: dict[str, deque] = defaultdict(lambda: deque(maxlen=10))
@@ -142,6 +151,10 @@ def build_features(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     def _conf_elo(confederation: str) -> float:
         n = conf_cnt[confederation]
         return conf_sum[confederation] / n if n else ELO_BASE
+
+    # Serving snapshot: each team's POST-match state after its last (pre-cutoff)
+    # match. Overwritten chronologically, so the final write per team wins.
+    team_state: dict[str, dict] = {}
 
     rows: list[dict] = []
     for _, m in df.iterrows():
@@ -244,12 +257,36 @@ def build_features(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
         tourn_n[(home, *tourn_year)] += 1
         tourn_n[(away, *tourn_year)] += 1
 
+        # Serving snapshot AFTER this match (post-match form/Elo/conf_elo). Only
+        # pre-cutoff matches update it, so served state never sees the tournament.
+        if state_cutoff is None or m["date"] < state_cutoff:
+            for team, t_elo, t_conf in ((home, new_h, h_conf), (away, new_a, a_conf)):
+                fr = list(form[team])
+                wr5, gd5 = _form_stats(fr[-5:])
+                wr10, gd10 = _form_stats(fr)
+                team_state[team] = {
+                    "team": team,
+                    "elo": round(t_elo, 2),
+                    "win_rate_5": round(wr5, 4),
+                    "win_rate_10": round(wr10, 4),
+                    "gd_5": round(gd5, 4),
+                    "gd_10": round(gd10, 4),
+                    "confederation": t_conf,
+                    "conf_elo": round(_conf_elo(t_conf), 2),
+                    "last_match_date": m["date"],
+                }
+
     features = pd.DataFrame(rows)
     elo_df = (
         pd.DataFrame(sorted(elo.items(), key=lambda x: -x[1]), columns=["team", "elo"])
         .assign(elo=lambda d: d["elo"].round(1), confederation=lambda d: d["team"].map(_conf))
     )
-    return features, elo_df
+    team_state_df = pd.DataFrame(
+        team_state.values(),
+        columns=["team", "elo", "win_rate_5", "win_rate_10", "gd_5", "gd_10",
+                 "confederation", "conf_elo", "last_match_date"],
+    ).sort_values("team").reset_index(drop=True)
+    return features, elo_df, team_state_df
 
 
 def main() -> None:
@@ -265,15 +302,21 @@ def main() -> None:
     print(f"  {len(df):,} matches  ({df['date'].min().date()} – {df['date'].max().date()})")
 
     print("Building features ...")
-    features, elo_df = build_features(df)
+    # Freeze the SERVING snapshot strictly before the tournament (same cutoff
+    # the live Predictor enforces). feature_df itself is the full history.
+    from simulate import PRE_TOURNAMENT_CUTOFF
+    features, elo_df, team_state_df = build_features(df, state_cutoff=PRE_TOURNAMENT_CUTOFF)
 
     out_feat = PROCESSED_DIR / "features.csv"
     out_elo = PROCESSED_DIR / "elo_ratings.csv"
+    out_state = PROCESSED_DIR / "team_state.csv"
     features.to_csv(out_feat, index=False)
     elo_df.to_csv(out_elo, index=False)
+    team_state_df.to_csv(out_state, index=False)
 
     print(f"\nfeatures.csv    {len(features):,} rows x {features.shape[1]} cols  ->  {out_feat}")
     print(f"elo_ratings.csv {len(elo_df):,} teams                         ->  {out_elo}")
+    print(f"team_state.csv  {len(team_state_df):,} teams (serving snapshot)        ->  {out_state}")
 
     print("\nOutcome split:")
     labels = {0: "Home win", 1: "Draw    ", 2: "Away win"}
