@@ -90,6 +90,27 @@ Bypass with `git push --no-verify` when needed.
 | App | Streamlit |
 | Stats | SciPy |
 
+## Live result tracker
+
+The Prediction Tracker grades the model's pre-tournament predictions against live
+WC 2026 results from [football-data.org](https://www.football-data.org). It is
+scored on the **same target the model was trained on**: the result *after extra
+time, excluding penalty shootouts* (the martj42 convention).
+
+football-data.org's v4 `score.fullTime` already **includes** extra-time goals,
+so extra-time knockouts score directly (verified: England 2-1 Slovakia =
+regular-time 1-1 + extra-time 1-0). For **penalty-shootout** knockouts,
+`fullTime` folds in the shootout tally (verified: Portugal 0-0 Slovenia after
+extra time, won 3-0 on penalties, reported by the API as `fullTime` 3-0). The
+tracker strips the shootout and records such a match as the **after-extra-time
+draw** it was on the pitch, matching the training target — the model is never
+credited or penalised for predicting a shootout winner. Group-stage games are
+always 90 minutes, so this only affects knockout fixtures.
+
+The model's team state is frozen strictly before the tournament
+(`simulate.PRE_TOURNAMENT_CUTOFF`, 2026-06-11) in code, so predictions stay
+leakage-free even if the data is rebuilt mid-tournament from the live feed.
+
 ## Tournament details
 
 - **Edition:** 23rd FIFA World Cup

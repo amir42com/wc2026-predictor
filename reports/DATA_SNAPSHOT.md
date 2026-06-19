@@ -51,3 +51,18 @@ python src/paired_tests.py      # appends McNemar + bootstrap rows to the metric
 
 `data/raw/` and `data/processed/` are gitignored; only this checksum and the
 derived `reports/` outputs are tracked.
+
+## Live tracker target (football-data.org)
+
+The Prediction Tracker scores the model on its **training target**: the result
+*after extra time, excluding penalty shootouts*. football-data.org's v4
+`score.fullTime` **includes** extra-time goals (verified against Euro 2024:
+England 2-1 Slovakia = `regularTime` 1-1 + `extraTime` 1-0, `duration`
+`EXTRA_TIME`), so extra-time knockouts already match the target. For a
+**penalty shootout**, `fullTime` folds in the shootout tally (verified:
+Portugal-Slovenia, `regularTime`/`extraTime` 0-0, `penalties` 3-0, `fullTime`
+3-0, `duration` `PENALTY_SHOOTOUT`); `fetch_results.score_matches` strips the
+shootout and records the after-ET **draw**, so the recorded outcome matches the
+target. Residual presentation note: such a match shows its after-ET score (e.g.
+0-0) in the tracker, with the API `winner`/`duration` retained in the cached
+payload for audit — the W/D/L the model is graded on is the draw.
