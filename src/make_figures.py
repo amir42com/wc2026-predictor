@@ -1,11 +1,11 @@
 """
-Article figures 3, 4 and 5 from the backtest export.
+Article figures 3, 4 and 6 from the backtest export.
 
 Reads  reports/backtest_predictions.csv     (written by src/export_backtest.py)
        reports/backtest_metrics_summary.csv  (combined row → Figure 3 table)
 Writes reports/figures/figure3_backtest_table.png
        reports/figures/figure4_accuracy_wilson.png
-       reports/figures/figure5_blend_reliability.png
+       reports/figures/figure6_blend_reliability.png
 
 matplotlib only (no seaborn).
 
@@ -34,7 +34,7 @@ DARK_SPINE = "#26305a"  # axis spines
 ACCENT = "#4fc3f7"      # accent / highlight
 
 # Outcome palette — RESERVED for match outcomes (home/draw/away). Used by
-# Figure 5 (reliability) only; lightened to read on the navy background.
+# Figure 6 (reliability) only; lightened to read on the navy background.
 OUTCOME_COLORS = {"home": "#4fc3f7", "draw": "#b4bdd1", "away": "#f59e0b"}
 
 # System palette — for figures that compare the three SYSTEMS (Figures 3 & 4).
@@ -205,9 +205,9 @@ def figure4(df: pd.DataFrame) -> None:
 
 
 # --------------------------------------------------------------------------- #
-# Figure 5 — Blend reliability (one-vs-rest per class)
+# Figure 6 — Blend reliability (one-vs-rest per class)
 # --------------------------------------------------------------------------- #
-def figure5(df: pd.DataFrame) -> None:
+def figure6(df: pd.DataFrame) -> None:
     y = df["y_true"].values
     proba = df[["blend_home", "blend_draw", "blend_away"]].values
 
@@ -249,7 +249,7 @@ def figure5(df: pd.DataFrame) -> None:
         ax.spines[s].set_visible(False)
 
     fig.tight_layout()
-    out = FIG_DIR / "figure5_blend_reliability.png"
+    out = FIG_DIR / "figure6_blend_reliability.png"
     fig.savefig(out, dpi=220, facecolor=DARK_BG)
     plt.close(fig)
     print(f"Wrote {out}")
@@ -392,7 +392,7 @@ def main() -> None:
     print()
     figure4(df)
     print()
-    figure5(df)
+    figure6(df)
 
 
 if __name__ == "__main__":

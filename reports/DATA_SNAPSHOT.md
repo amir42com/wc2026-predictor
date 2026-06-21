@@ -44,9 +44,10 @@ Expected: `50f17eb331a3d8367184f3314cf41616782f842ebb39e42191260b414b56bc78`
 ## Reproduce the reports
 
 ```bash
-python src/export_backtest.py   # reports/backtest_predictions.csv + metrics summary
-python src/make_figures.py      # reports/figures/figure4_*.png, figure5_*.png
-python src/paired_tests.py      # appends McNemar + bootstrap rows to the metrics summary
+python src/export_backtest.py     # reports/backtest_predictions.csv + metrics summary
+python src/make_figures.py        # figures 3 (table), 4 (accuracy), 6 (reliability)
+python src/make_by_tournament.py  # backtest_by_tournament.csv + figure 5 (by tournament)
+python src/paired_tests.py        # appends McNemar + bootstrap rows to the metrics summary
 ```
 
 `data/raw/` and `data/processed/` are gitignored; only this checksum and the
