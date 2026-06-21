@@ -11,7 +11,7 @@ combined summary (export_backtest._metrics → accuracy, log-loss with labels
 Reuses make_figures' dark theme + SYSTEM_COLORS palette (no duplicated style).
 
 Writes  reports/backtest_by_tournament.csv          (9 rows: 3 years x 3 systems)
-        reports/figures/figure9_by_tournament.png   (grouped log-loss + Brier)
+        reports/figures/figure5_by_tournament.png   (grouped log-loss + Brier)
 
 Usage:
     python src/make_by_tournament.py
@@ -62,7 +62,7 @@ def write_csv(table: pd.DataFrame) -> None:
     print(f"Wrote {len(table)} rows -> {OUT_CSV}")
 
 
-def figure9(table: pd.DataFrame) -> None:
+def figure5(table: pd.DataFrame) -> None:
     """Grouped bars: each tournament's three systems side by side, log-loss
     (left) and Brier (right). Lower is better; the panels expose that the
     blend's probabilistic-scoring edge is a 2014 effect that reverses in 2018."""
@@ -111,7 +111,7 @@ def figure9(table: pd.DataFrame) -> None:
                  "The blend's edge over Elo is a 2014 effect and reverses in 2018",
                  fontsize=11.5, color=DARK_TEXT, y=1.13)
     fig.tight_layout(rect=(0, 0, 1, 0.99))
-    out = FIG_DIR / "figure9_by_tournament.png"
+    out = FIG_DIR / "figure5_by_tournament.png"
     fig.savefig(out, dpi=220, facecolor=DARK_BG, bbox_inches="tight")
     plt.close(fig)
     print(f"Wrote {out}")
@@ -157,7 +157,7 @@ def main() -> None:
     FIG_DIR.mkdir(parents=True, exist_ok=True)
     table = per_tournament_table()
     write_csv(table)
-    figure9(table)
+    figure5(table)
     _print_table(table)
     _reconcile(table)
     _verdict(table)
