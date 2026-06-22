@@ -1,0 +1,8 @@
+# Git hooks are executed via /bin/sh; a CRLF shebang breaks them on Linux/macOS
+# ("/bin/sh^M: bad interpreter"). Force LF regardless of core.autocrlf.
+scripts/pre-commit text eol=lf
+scripts/pre-push   text eol=lf
+
+# Generated export consumed by Streamlit Cloud (Linux). uv writes it as LF;
+# pinning eol=lf stops autocrlf from rewriting it and causing false diff churn.
+requirements.txt   text eol=lf
