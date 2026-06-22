@@ -35,16 +35,26 @@ wc2026_predictor/
 
 ### 1. Install dependencies
 
+This project uses [uv](https://docs.astral.sh/uv/). One command creates the
+virtual environment and installs the locked dependencies:
+
 ```bash
-python -m venv .venv
-.venv\Scripts\activate        # Windows
-pip install -r requirements.txt
+uv sync
 ```
+
+Prefix subsequent commands with `uv run` (no manual activation needed), or
+activate `.venv\Scripts\activate` (Windows) / `source .venv/bin/activate` once.
+
+> **Cross-volume note:** if uv's cache and the repo live on different drives
+> (e.g. cache on `C:`, project on `D:`), uv prints a harmless
+> `Failed to hardlink files; falling back to full copy` warning. To silence it,
+> set `UV_LINK_MODE=copy` in your shell for the session, e.g. PowerShell
+> `$env:UV_LINK_MODE = "copy"`. This is local-only guidance — don't commit it.
 
 ### 2. Fetch raw data
 
 ```bash
-python src/fetch_data.py
+uv run python src/fetch_data.py
 ```
 
 Downloads to `data/raw/`:
@@ -55,14 +65,14 @@ Downloads to `data/raw/`:
 ### 3. Build features & train the model
 
 ```bash
-python src/features.py
-python src/train.py
+uv run python src/features.py
+uv run python src/train.py
 ```
 
 ### 4. Run the Streamlit app
 
 ```bash
-streamlit run app/streamlit_app.py
+uv run streamlit run app/streamlit_app.py
 ```
 
 ### 5. (For contributors) Enable the pre-push smoke test
