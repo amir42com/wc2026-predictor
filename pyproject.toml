@@ -1,0 +1,37 @@
+[project]
+name = "wc2026-predictor"
+version = "2.0"
+description = "Machine-learning match-outcome predictor for the 2026 FIFA World Cup, with a Streamlit dashboard."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "pandas==3.0.3",
+    "numpy==2.4.6",
+    "scikit-learn==1.9.0",
+    "xgboost==3.2.0",
+    "streamlit==1.58.0",
+    "plotly==6.8.0",
+    "shap==0.51.0",
+    "requests==2.34.2",
+    "scipy==1.17.1",
+    "matplotlib==3.10.9",
+    "tqdm==4.68.2",
+    "joblib==1.5.3",
+]
+
+[tool.uv]
+# This repo runs flat scripts under src/ (e.g. `from train import ...`) via
+# sys.path insertion; it is an application, not an installable library, so uv
+# manages the environment without building/installing the project itself.
+package = false
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
+
+[tool.pytest.ini_options]
+# Only collect the real suite; src/ holds run-directly scripts (e.g.
+# smoke_test.py) whose flat `from simulate import ...` imports aren't on
+# sys.path during pytest collection.
+testpaths = ["tests"]

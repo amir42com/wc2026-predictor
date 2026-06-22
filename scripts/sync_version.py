@@ -83,6 +83,13 @@ TARGETS = [
         required=False,
         label="CLAUDE.md (Version: header)",
     ),
+    # pyproject.toml -> version = "X.Y"  (project table, no 'v' prefix)
+    Target(
+        "pyproject.toml",
+        re.compile(r'(?P<pre>^version\s*=\s*")(?P<ver>' + TOKEN_RE + r')(?P<post>"\s*$)', re.M),
+        prefix="",
+        label="pyproject.toml (project.version)",
+    ),
 ]
 
 
