@@ -108,7 +108,8 @@ def figure5(table: pd.DataFrame) -> None:
         txt.set_color(DARK_TEXT)
 
     fig.suptitle("WC backtest by tournament — probabilistic scoring per system\n"
-                 "The blend's edge over Elo is a 2014 effect and reverses in 2018",
+                 "The blend's lower log-loss and Brier come from 2014 "
+                 "and reverse in 2018",
                  fontsize=11.5, color=DARK_TEXT, y=1.13)
     fig.tight_layout(rect=(0, 0, 1, 0.99))
     out = FIG_DIR / "figure5_by_tournament.png"
