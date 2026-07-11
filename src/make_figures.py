@@ -62,6 +62,24 @@ def _dark_axes(fig, ax) -> None:
 # --------------------------------------------------------------------------- #
 # Reusable stats helpers
 # --------------------------------------------------------------------------- #
+def _fmt_pct(p: float) -> str:
+    """
+    Percentage with one decimal — except when the value sits exactly on the
+    rounding boundary (108/192 = 56.25%), where Python's round-half-even
+    would render a misleading 56.2%; show both decimals instead.
+    """
+    pct = p * 100.0
+    if abs((pct * 10) % 1 - 0.5) < 1e-9:
+        return f"{pct:.2f}%"
+    return f"{pct:.1f}%"
+
+
+def _years_label(tournaments) -> str:
+    """Derive '2014/2018/2022' from 'WC <year>' values — never hard-coded."""
+    years = sorted({int(str(t).split()[-1]) for t in tournaments})
+    return "/".join(str(y) for y in years)
+
+
 def wilson_interval(k: int, n: int, z: float = 1.96) -> tuple[float, float]:
     """
     Wilson score interval for a binomial proportion k/n.
@@ -87,7 +105,7 @@ def multiclass_ece(y_true: np.ndarray, proba: np.ndarray, n_bins: int = 10,
     predicted probabilities (10 equal-frequency / quantile bins by default),
     and accumulate |confidence - accuracy| weighted by bin count. The overall
     ECE is the sample-weighted mean of the per-class ECEs (each class
-    contributes n samples), matching the reliability curves in figure 5.
+    contributes n samples), matching the reliability curves in figure 6.
 
     Returns (overall_ece, {class_index: per_class_ece}).
     """
@@ -173,7 +191,7 @@ def figure4(df: pd.DataFrame) -> None:
                 elinewidth=1.5, capsize=8, capthick=1.5, zorder=3)
 
     for xi, (acc, k, lo, hi) in enumerate(zip(accs, ks, los, his)):
-        ax.text(xi, acc + 0.002, f"{acc*100:.1f}%\n({k}/{n})",
+        ax.text(xi, acc + 0.002, f"{_fmt_pct(acc)}\n({k}/{n})",
                 ha="center", va="bottom", fontsize=10, fontweight="bold",
                 color=DARK_TEXT)
         ax.text(xi, hi + 0.006, f"95% CI\n[{lo*100:.1f}, {hi*100:.1f}]",
@@ -184,9 +202,11 @@ def figure4(df: pd.DataFrame) -> None:
     ax.set_xticklabels(labels, fontsize=11, color=DARK_TEXT)
     ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda v, _: f"{v*100:.0f}%"))
     ax.set_ylabel("Accuracy", fontsize=11)
-    ax.set_title("WC backtest accuracy (192 matches, 2014/2018/2022)\n"
-                 "Point estimates differ by ~5 matches; Wilson 95% intervals "
-                 "overlap heavily",
+    spread = max(ks) - min(ks)   # derived from the predictions, never hard-coded
+    ax.set_title(f"WC backtest accuracy ({n} matches, "
+                 f"{_years_label(df['tournament'])})\n"
+                 f"Point estimates differ by at most {spread} matches; "
+                 "Wilson 95% intervals overlap heavily",
                  fontsize=11.5)
     ax.grid(axis="y", color=DARK_GRID, linewidth=0.7, zorder=0)
     ax.set_axisbelow(True)
@@ -200,7 +220,7 @@ def figure4(df: pd.DataFrame) -> None:
     print(f"Wrote {out}")
     print("  Accuracy (k/n) with 95% Wilson intervals:")
     for label, k, acc, lo, hi in zip(labels, ks, accs, los, his):
-        print(f"    {label:<12} {k:>3}/{n}  {acc*100:5.1f}%  "
+        print(f"    {label:<12} {k:>3}/{n}  {_fmt_pct(acc):>7}  "
               f"[{lo*100:.1f}%, {hi*100:.1f}%]")
 
 
@@ -262,11 +282,12 @@ def figure6(df: pd.DataFrame) -> None:
 # --------------------------------------------------------------------------- #
 # Figure 3 — combined backtest comparison table (rendered as an image)
 # --------------------------------------------------------------------------- #
-def _combined_metrics() -> pd.DataFrame:
+def _combined_metrics() -> tuple[pd.DataFrame, int, str]:
     """
     Pull the COMBINED (192-match) row for each system from the metrics summary,
-    so the table can never drift from the data. Returns rows in fixed order
-    (Raw XGBoost, Blend, Elo baseline) with display names.
+    so the table can never drift from the data. Returns (rows in fixed order
+    (Raw XGBoost, Blend, Elo baseline) with display names, match count,
+    'YYYY/YYYY/YYYY' tournament label) — all derived from the CSV.
     """
     summary = pd.read_csv(REPORTS_DIR / "backtest_metrics_summary.csv")
     comb = summary[summary["tournament"] == "Combined"].set_index("model")
@@ -280,11 +301,14 @@ def _combined_metrics() -> pd.DataFrame:
                      "accuracy": float(r["accuracy"]),
                      "log_loss": float(r["log_loss"]),
                      "brier": float(r["brier"])})
-    return pd.DataFrame(rows)
+    n = int(comb["n"].iloc[0])
+    years = _years_label(t for t in summary["tournament"]
+                         if str(t).startswith("WC "))
+    return pd.DataFrame(rows), n, years
 
 
 def figure3() -> None:
-    data = _combined_metrics()
+    data, n_matches, years = _combined_metrics()
 
     # Best per metric: accuracy higher is better; log-loss / Brier lower.
     best = {"accuracy": int(data["accuracy"].idxmax()),
@@ -350,7 +374,7 @@ def figure3() -> None:
                 fontsize=11, color=INK, zorder=3)
 
         # Numeric cells (right-aligned), best value highlighted + bold
-        values = {"accuracy": f"{row['accuracy']*100:.1f}%",
+        values = {"accuracy": _fmt_pct(row["accuracy"]),
                   "log_loss": f"{row['log_loss']:.4f}",
                   "brier":    f"{row['brier']:.4f}"}
         for key, (xl, xr) in cols.items():
@@ -370,7 +394,7 @@ def figure3() -> None:
     # Footnote inside the image
     ax.text(0, row_bands[-1][0] - 0.10,
             "Accuracy higher is better; log-loss and Brier lower is better.  "
-            "192 matches, WC 2014/2018/2022, leakage-free.",
+            f"{n_matches} matches, WC {years}, leakage-free.",
             ha="left", va="top", fontsize=8, color=GREY, zorder=3)
 
     out = FIG_DIR / "figure3_backtest_table.png"
@@ -380,7 +404,7 @@ def figure3() -> None:
     print(f"Wrote {out}")
     print("  Combined-row values pulled from the metrics summary:")
     for _, r in data.iterrows():
-        print(f"    {r['system']:<13} acc {r['accuracy']*100:5.1f}%   "
+        print(f"    {r['system']:<13} acc {_fmt_pct(r['accuracy']):>7}   "
               f"log-loss {r['log_loss']:.4f}   Brier {r['brier']:.4f}")
 
 
