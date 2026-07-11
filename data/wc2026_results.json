@@ -1,8 +1,1556 @@
 {
-  "fetched_at": "2026-06-13T03:10:20+00:00",
+  "fetched_at": "2026-06-22T05:38:50+00:00",
   "source": "football-data.org",
-  "n_matches": 4,
+  "n_matches": 40,
   "matches": [
+    {
+      "date": "2026-06-22",
+      "utc": "2026-06-22T01:00:00Z",
+      "home_team": "New Zealand",
+      "away_team": "Egypt",
+      "home_score": 1,
+      "away_score": 3,
+      "winner": "AWAY_TEAM",
+      "duration": "REGULAR",
+      "actual_outcome": 2,
+      "predicted_outcome": 2,
+      "p_home": 0.1696,
+      "p_draw": 0.2354,
+      "p_away": 0.595,
+      "scorelines": [
+        [
+          0,
+          1,
+          0.1169
+        ],
+        [
+          1,
+          1,
+          0.1122
+        ],
+        [
+          0,
+          2,
+          0.1121
+        ],
+        [
+          1,
+          2,
+          0.098
+        ],
+        [
+          0,
+          0,
+          0.072
+        ]
+      ],
+      "correct": true
+    },
+    {
+      "date": "2026-06-21",
+      "utc": "2026-06-21T22:00:00Z",
+      "home_team": "Uruguay",
+      "away_team": "Cape Verde",
+      "home_score": 2,
+      "away_score": 2,
+      "winner": "DRAW",
+      "duration": "REGULAR",
+      "actual_outcome": 1,
+      "predicted_outcome": 0,
+      "p_home": 0.6563,
+      "p_draw": 0.2247,
+      "p_away": 0.119,
+      "scorelines": [
+        [
+          1,
+          0,
+          0.147
+        ],
+        [
+          2,
+          0,
+          0.1405
+        ],
+        [
+          1,
+          1,
+          0.1037
+        ],
+        [
+          2,
+          1,
+          0.0913
+        ],
+        [
+          0,
+          0,
+          0.0871
+        ]
+      ],
+      "correct": false
+    },
+    {
+      "date": "2026-06-21",
+      "utc": "2026-06-21T19:00:00Z",
+      "home_team": "Belgium",
+      "away_team": "Iran",
+      "home_score": 0,
+      "away_score": 0,
+      "winner": "DRAW",
+      "duration": "REGULAR",
+      "actual_outcome": 1,
+      "predicted_outcome": 0,
+      "p_home": 0.564,
+      "p_draw": 0.2057,
+      "p_away": 0.2303,
+      "scorelines": [
+        [
+          2,
+          1,
+          0.0908
+        ],
+        [
+          1,
+          1,
+          0.0833
+        ],
+        [
+          3,
+          1,
+          0.0693
+        ],
+        [
+          2,
+          2,
+          0.065
+        ],
+        [
+          2,
+          0,
+          0.0634
+        ]
+      ],
+      "correct": false
+    },
+    {
+      "date": "2026-06-21",
+      "utc": "2026-06-21T16:00:00Z",
+      "home_team": "Spain",
+      "away_team": "Saudi Arabia",
+      "home_score": 4,
+      "away_score": 0,
+      "winner": "HOME_TEAM",
+      "duration": "REGULAR",
+      "actual_outcome": 0,
+      "predicted_outcome": 0,
+      "p_home": 0.8033,
+      "p_draw": 0.1418,
+      "p_away": 0.0549,
+      "scorelines": [
+        [
+          2,
+          0,
+          0.1507
+        ],
+        [
+          3,
+          0,
+          0.1264
+        ],
+        [
+          1,
+          0,
+          0.1167
+        ],
+        [
+          2,
+          1,
+          0.0797
+        ],
+        [
+          4,
+          0,
+          0.0795
+        ]
+      ],
+      "correct": true
+    },
+    {
+      "date": "2026-06-21",
+      "utc": "2026-06-21T04:00:00Z",
+      "home_team": "Tunisia",
+      "away_team": "Japan",
+      "home_score": 0,
+      "away_score": 4,
+      "winner": "AWAY_TEAM",
+      "duration": "REGULAR",
+      "actual_outcome": 2,
+      "predicted_outcome": 2,
+      "p_home": 0.1436,
+      "p_draw": 0.2319,
+      "p_away": 0.6245,
+      "scorelines": [
+        [
+          0,
+          1,
+          0.1326
+        ],
+        [
+          0,
+          2,
+          0.1262
+        ],
+        [
+          1,
+          1,
+          0.1094
+        ],
+        [
+          1,
+          2,
+          0.0953
+        ],
+        [
+          0,
+          0,
+          0.0805
+        ]
+      ],
+      "correct": true
+    },
+    {
+      "date": "2026-06-21",
+      "utc": "2026-06-21T00:00:00Z",
+      "home_team": "Ecuador",
+      "away_team": "Cura\u00e7ao",
+      "home_score": 0,
+      "away_score": 0,
+      "winner": "DRAW",
+      "duration": "REGULAR",
+      "actual_outcome": 1,
+      "predicted_outcome": 0,
+      "p_home": 0.8117,
+      "p_draw": 0.1394,
+      "p_away": 0.0489,
+      "scorelines": [
+        [
+          2,
+          0,
+          0.1601
+        ],
+        [
+          3,
+          0,
+          0.1328
+        ],
+        [
+          1,
+          0,
+          0.1257
+        ],
+        [
+          4,
+          0,
+          0.0826
+        ],
+        [
+          2,
+          1,
+          0.0759
+        ]
+      ],
+      "correct": false
+    },
+    {
+      "date": "2026-06-20",
+      "utc": "2026-06-20T20:00:00Z",
+      "home_team": "Germany",
+      "away_team": "Ivory Coast",
+      "home_score": 2,
+      "away_score": 1,
+      "winner": "HOME_TEAM",
+      "duration": "REGULAR",
+      "actual_outcome": 0,
+      "predicted_outcome": 0,
+      "p_home": 0.643,
+      "p_draw": 0.2063,
+      "p_away": 0.1508,
+      "scorelines": [
+        [
+          2,
+          0,
+          0.105
+        ],
+        [
+          2,
+          1,
+          0.099
+        ],
+        [
+          1,
+          1,
+          0.0972
+        ],
+        [
+          1,
+          0,
+          0.0936
+        ],
+        [
+          3,
+          0,
+          0.0748
+        ]
+      ],
+      "correct": true
+    },
+    {
+      "date": "2026-06-20",
+      "utc": "2026-06-20T17:00:00Z",
+      "home_team": "Netherlands",
+      "away_team": "Sweden",
+      "home_score": 5,
+      "away_score": 1,
+      "winner": "HOME_TEAM",
+      "duration": "REGULAR",
+      "actual_outcome": 0,
+      "predicted_outcome": 0,
+      "p_home": 0.5615,
+      "p_draw": 0.2588,
+      "p_away": 0.1797,
+      "scorelines": [
+        [
+          1,
+          0,
+          0.1372
+        ],
+        [
+          1,
+          1,
+          0.1211
+        ],
+        [
+          2,
+          0,
+          0.1159
+        ],
+        [
+          0,
+          0,
+          0.0939
+        ],
+        [
+          2,
+          1,
+          0.0935
+        ]
+      ],
+      "correct": true
+    },
+    {
+      "date": "2026-06-20",
+      "utc": "2026-06-20T03:00:00Z",
+      "home_team": "Turkey",
+      "away_team": "Paraguay",
+      "home_score": 0,
+      "away_score": 1,
+      "winner": "AWAY_TEAM",
+      "duration": "REGULAR",
+      "actual_outcome": 2,
+      "predicted_outcome": 0,
+      "p_home": 0.4506,
+      "p_draw": 0.2655,
+      "p_away": 0.284,
+      "scorelines": [
+        [
+          1,
+          1,
+          0.1264
+        ],
+        [
+          1,
+          0,
+          0.0971
+        ],
+        [
+          2,
+          1,
+          0.0921
+        ],
+        [
+          2,
+          0,
+          0.0789
+        ],
+        [
+          0,
+          0,
+          0.0734
+        ]
+      ],
+      "correct": false
+    },
+    {
+      "date": "2026-06-20",
+      "utc": "2026-06-20T00:30:00Z",
+      "home_team": "Brazil",
+      "away_team": "Haiti",
+      "home_score": 3,
+      "away_score": 0,
+      "winner": "HOME_TEAM",
+      "duration": "REGULAR",
+      "actual_outcome": 0,
+      "predicted_outcome": 0,
+      "p_home": 0.7776,
+      "p_draw": 0.1528,
+      "p_away": 0.0696,
+      "scorelines": [
+        [
+          2,
+          0,
+          0.1378
+        ],
+        [
+          3,
+          0,
+          0.1142
+        ],
+        [
+          1,
+          0,
+          0.1075
+        ],
+        [
+          2,
+          1,
+          0.086
+        ],
+        [
+          1,
+          1,
+          0.0727
+        ]
+      ],
+      "correct": true
+    },
+    {
+      "date": "2026-06-19",
+      "utc": "2026-06-19T22:00:00Z",
+      "home_team": "Scotland",
+      "away_team": "Morocco",
+      "home_score": 0,
+      "away_score": 1,
+      "winner": "AWAY_TEAM",
+      "duration": "REGULAR",
+      "actual_outcome": 2,
+      "predicted_outcome": 2,
+      "p_home": 0.1782,
+      "p_draw": 0.2419,
+      "p_away": 0.5798,
+      "scorelines": [
+        [
+          0,
+          1,
+          0.1188
+        ],
+        [
+          1,
+          1,
+          0.1152
+        ],
+        [
+          0,
+          2,
+          0.1105
+        ],
+        [
+          1,
+          2,
+          0.0975
+        ],
+        [
+          0,
+          0,
+          0.0754
+        ]
+      ],
+      "correct": true
+    },
+    {
+      "date": "2026-06-19",
+      "utc": "2026-06-19T19:00:00Z",
+      "home_team": "United States",
+      "away_team": "Australia",
+      "home_score": 2,
+      "away_score": 0,
+      "winner": "HOME_TEAM",
+      "duration": "REGULAR",
+      "actual_outcome": 0,
+      "predicted_outcome": 0,
+      "p_home": 0.4427,
+      "p_draw": 0.2553,
+      "p_away": 0.302,
+      "scorelines": [
+        [
+          1,
+          1,
+          0.1197
+        ],
+        [
+          2,
+          1,
+          0.0919
+        ],
+        [
+          1,
+          0,
+          0.0823
+        ],
+        [
+          1,
+          2,
+          0.0739
+        ],
+        [
+          2,
+          0,
+          0.0709
+        ]
+      ],
+      "correct": true
+    },
+    {
+      "date": "2026-06-19",
+      "utc": "2026-06-19T01:00:00Z",
+      "home_team": "Mexico",
+      "away_team": "South Korea",
+      "home_score": 1,
+      "away_score": 0,
+      "winner": "HOME_TEAM",
+      "duration": "REGULAR",
+      "actual_outcome": 0,
+      "predicted_outcome": 0,
+      "p_home": 0.5151,
+      "p_draw": 0.2467,
+      "p_away": 0.2382,
+      "scorelines": [
+        [
+          1,
+          1,
+          0.1166
+        ],
+        [
+          2,
+          1,
+          0.0972
+        ],
+        [
+          1,
+          0,
+          0.0933
+        ],
+        [
+          2,
+          0,
+          0.0865
+        ],
+        [
+          1,
+          2,
+          0.0624
+        ]
+      ],
+      "correct": true
+    },
+    {
+      "date": "2026-06-18",
+      "utc": "2026-06-18T22:00:00Z",
+      "home_team": "Canada",
+      "away_team": "Qatar",
+      "home_score": 6,
+      "away_score": 0,
+      "winner": "HOME_TEAM",
+      "duration": "REGULAR",
+      "actual_outcome": 0,
+      "predicted_outcome": 0,
+      "p_home": 0.7758,
+      "p_draw": 0.1462,
+      "p_away": 0.078,
+      "scorelines": [
+        [
+          2,
+          0,
+          0.1156
+        ],
+        [
+          3,
+          0,
+          0.103
+        ],
+        [
+          2,
+          1,
+          0.0876
+        ],
+        [
+          1,
+          0,
+          0.0832
+        ],
+        [
+          3,
+          1,
+          0.0781
+        ]
+      ],
+      "correct": true
+    },
+    {
+      "date": "2026-06-18",
+      "utc": "2026-06-18T19:00:00Z",
+      "home_team": "Switzerland",
+      "away_team": "Bosnia and Herzegovina",
+      "home_score": 4,
+      "away_score": 1,
+      "winner": "HOME_TEAM",
+      "duration": "REGULAR",
+      "actual_outcome": 0,
+      "predicted_outcome": 0,
+      "p_home": 0.6353,
+      "p_draw": 0.2255,
+      "p_away": 0.1392,
+      "scorelines": [
+        [
+          1,
+          0,
+          0.1283
+        ],
+        [
+          2,
+          0,
+          0.1259
+        ],
+        [
+          1,
+          1,
+          0.1067
+        ],
+        [
+          2,
+          1,
+          0.0959
+        ],
+        [
+          3,
+          0,
+          0.0792
+        ]
+      ],
+      "correct": true
+    },
+    {
+      "date": "2026-06-18",
+      "utc": "2026-06-18T16:00:00Z",
+      "home_team": "Czech Republic",
+      "away_team": "South Africa",
+      "home_score": 1,
+      "away_score": 1,
+      "winner": "DRAW",
+      "duration": "REGULAR",
+      "actual_outcome": 1,
+      "predicted_outcome": 0,
+      "p_home": 0.5863,
+      "p_draw": 0.2373,
+      "p_away": 0.1764,
+      "scorelines": [
+        [
+          1,
+          0,
+          0.1144
+        ],
+        [
+          1,
+          1,
+          0.1131
+        ],
+        [
+          2,
+          0,
+          0.1092
+        ],
+        [
+          2,
+          1,
+          0.0982
+        ],
+        [
+          0,
+          0,
+          0.0711
+        ]
+      ],
+      "correct": false
+    },
+    {
+      "date": "2026-06-18",
+      "utc": "2026-06-18T02:00:00Z",
+      "home_team": "Uzbekistan",
+      "away_team": "Colombia",
+      "home_score": 1,
+      "away_score": 3,
+      "winner": "AWAY_TEAM",
+      "duration": "REGULAR",
+      "actual_outcome": 2,
+      "predicted_outcome": 2,
+      "p_home": 0.1372,
+      "p_draw": 0.2022,
+      "p_away": 0.6606,
+      "scorelines": [
+        [
+          0,
+          2,
+          0.1117
+        ],
+        [
+          0,
+          1,
+          0.0993
+        ],
+        [
+          1,
+          2,
+          0.0983
+        ],
+        [
+          1,
+          1,
+          0.0959
+        ],
+        [
+          0,
+          3,
+          0.0801
+        ]
+      ],
+      "correct": true
+    },
+    {
+      "date": "2026-06-17",
+      "utc": "2026-06-17T23:00:00Z",
+      "home_team": "Ghana",
+      "away_team": "Panama",
+      "home_score": 1,
+      "away_score": 0,
+      "winner": "HOME_TEAM",
+      "duration": "REGULAR",
+      "actual_outcome": 0,
+      "predicted_outcome": 2,
+      "p_home": 0.1839,
+      "p_draw": 0.2356,
+      "p_away": 0.5805,
+      "scorelines": [
+        [
+          1,
+          1,
+          0.1122
+        ],
+        [
+          0,
+          1,
+          0.1076
+        ],
+        [
+          0,
+          2,
+          0.1045
+        ],
+        [
+          1,
+          2,
+          0.0988
+        ],
+        [
+          0,
+          0,
+          0.0664
+        ]
+      ],
+      "correct": false
+    },
+    {
+      "date": "2026-06-17",
+      "utc": "2026-06-17T20:00:00Z",
+      "home_team": "England",
+      "away_team": "Croatia",
+      "home_score": 4,
+      "away_score": 2,
+      "winner": "HOME_TEAM",
+      "duration": "REGULAR",
+      "actual_outcome": 0,
+      "predicted_outcome": 0,
+      "p_home": 0.4642,
+      "p_draw": 0.2522,
+      "p_away": 0.2836,
+      "scorelines": [
+        [
+          1,
+          1,
+          0.1182
+        ],
+        [
+          2,
+          1,
+          0.0938
+        ],
+        [
+          1,
+          0,
+          0.0838
+        ],
+        [
+          2,
+          0,
+          0.0745
+        ],
+        [
+          1,
+          2,
+          0.0708
+        ]
+      ],
+      "correct": true
+    },
+    {
+      "date": "2026-06-17",
+      "utc": "2026-06-17T17:00:00Z",
+      "home_team": "Portugal",
+      "away_team": "DR Congo",
+      "home_score": 1,
+      "away_score": 1,
+      "winner": "DRAW",
+      "duration": "REGULAR",
+      "actual_outcome": 1,
+      "predicted_outcome": 0,
+      "p_home": 0.7147,
+      "p_draw": 0.1888,
+      "p_away": 0.0965,
+      "scorelines": [
+        [
+          2,
+          0,
+          0.1384
+        ],
+        [
+          1,
+          0,
+          0.1238
+        ],
+        [
+          3,
+          0,
+          0.0997
+        ],
+        [
+          2,
+          1,
+          0.092
+        ],
+        [
+          1,
+          1,
+          0.0894
+        ]
+      ],
+      "correct": false
+    },
+    {
+      "date": "2026-06-17",
+      "utc": "2026-06-17T04:00:00Z",
+      "home_team": "Austria",
+      "away_team": "Jordan",
+      "home_score": 3,
+      "away_score": 1,
+      "winner": "HOME_TEAM",
+      "duration": "REGULAR",
+      "actual_outcome": 0,
+      "predicted_outcome": 0,
+      "p_home": 0.6687,
+      "p_draw": 0.1953,
+      "p_away": 0.136,
+      "scorelines": [
+        [
+          2,
+          0,
+          0.1067
+        ],
+        [
+          2,
+          1,
+          0.0979
+        ],
+        [
+          1,
+          1,
+          0.0918
+        ],
+        [
+          1,
+          0,
+          0.0909
+        ],
+        [
+          3,
+          0,
+          0.0797
+        ]
+      ],
+      "correct": true
+    },
+    {
+      "date": "2026-06-17",
+      "utc": "2026-06-17T01:00:00Z",
+      "home_team": "Argentina",
+      "away_team": "Algeria",
+      "home_score": 3,
+      "away_score": 0,
+      "winner": "HOME_TEAM",
+      "duration": "REGULAR",
+      "actual_outcome": 0,
+      "predicted_outcome": 0,
+      "p_home": 0.7028,
+      "p_draw": 0.1754,
+      "p_away": 0.1218,
+      "scorelines": [
+        [
+          2,
+          0,
+          0.0992
+        ],
+        [
+          2,
+          1,
+          0.0947
+        ],
+        [
+          3,
+          0,
+          0.0819
+        ],
+        [
+          1,
+          1,
+          0.0803
+        ],
+        [
+          3,
+          1,
+          0.0782
+        ]
+      ],
+      "correct": true
+    },
+    {
+      "date": "2026-06-16",
+      "utc": "2026-06-16T22:00:00Z",
+      "home_team": "Iraq",
+      "away_team": "Norway",
+      "home_score": 1,
+      "away_score": 4,
+      "winner": "AWAY_TEAM",
+      "duration": "REGULAR",
+      "actual_outcome": 2,
+      "predicted_outcome": 2,
+      "p_home": 0.1416,
+      "p_draw": 0.2025,
+      "p_away": 0.6559,
+      "scorelines": [
+        [
+          0,
+          2,
+          0.1086
+        ],
+        [
+          1,
+          2,
+          0.0985
+        ],
+        [
+          0,
+          1,
+          0.0959
+        ],
+        [
+          1,
+          1,
+          0.0957
+        ],
+        [
+          0,
+          3,
+          0.0782
+        ]
+      ],
+      "correct": true
+    },
+    {
+      "date": "2026-06-16",
+      "utc": "2026-06-16T19:00:00Z",
+      "home_team": "France",
+      "away_team": "Senegal",
+      "home_score": 3,
+      "away_score": 1,
+      "winner": "HOME_TEAM",
+      "duration": "REGULAR",
+      "actual_outcome": 0,
+      "predicted_outcome": 0,
+      "p_home": 0.5877,
+      "p_draw": 0.2375,
+      "p_away": 0.1749,
+      "scorelines": [
+        [
+          1,
+          0,
+          0.1157
+        ],
+        [
+          1,
+          1,
+          0.1132
+        ],
+        [
+          2,
+          0,
+          0.1102
+        ],
+        [
+          2,
+          1,
+          0.0981
+        ],
+        [
+          0,
+          0,
+          0.0719
+        ]
+      ],
+      "correct": true
+    },
+    {
+      "date": "2026-06-16",
+      "utc": "2026-06-16T01:00:00Z",
+      "home_team": "Iran",
+      "away_team": "New Zealand",
+      "home_score": 2,
+      "away_score": 2,
+      "winner": "DRAW",
+      "duration": "REGULAR",
+      "actual_outcome": 1,
+      "predicted_outcome": 0,
+      "p_home": 0.6946,
+      "p_draw": 0.1758,
+      "p_away": 0.1296,
+      "scorelines": [
+        [
+          2,
+          1,
+          0.0942
+        ],
+        [
+          2,
+          0,
+          0.0926
+        ],
+        [
+          1,
+          1,
+          0.0788
+        ],
+        [
+          3,
+          1,
+          0.0788
+        ],
+        [
+          3,
+          0,
+          0.0775
+        ]
+      ],
+      "correct": false
+    },
+    {
+      "date": "2026-06-15",
+      "utc": "2026-06-15T22:00:00Z",
+      "home_team": "Saudi Arabia",
+      "away_team": "Uruguay",
+      "home_score": 1,
+      "away_score": 1,
+      "winner": "DRAW",
+      "duration": "REGULAR",
+      "actual_outcome": 1,
+      "predicted_outcome": 2,
+      "p_home": 0.1317,
+      "p_draw": 0.2032,
+      "p_away": 0.6651,
+      "scorelines": [
+        [
+          0,
+          2,
+          0.1168
+        ],
+        [
+          0,
+          1,
+          0.1055
+        ],
+        [
+          1,
+          2,
+          0.0977
+        ],
+        [
+          1,
+          1,
+          0.0967
+        ],
+        [
+          0,
+          3,
+          0.0826
+        ]
+      ],
+      "correct": false
+    },
+    {
+      "date": "2026-06-15",
+      "utc": "2026-06-15T19:00:00Z",
+      "home_team": "Belgium",
+      "away_team": "Egypt",
+      "home_score": 1,
+      "away_score": 1,
+      "winner": "DRAW",
+      "duration": "REGULAR",
+      "actual_outcome": 1,
+      "predicted_outcome": 0,
+      "p_home": 0.5566,
+      "p_draw": 0.2341,
+      "p_away": 0.2093,
+      "scorelines": [
+        [
+          1,
+          1,
+          0.1102
+        ],
+        [
+          2,
+          1,
+          0.0989
+        ],
+        [
+          1,
+          0,
+          0.0919
+        ],
+        [
+          2,
+          0,
+          0.0916
+        ],
+        [
+          3,
+          1,
+          0.0622
+        ]
+      ],
+      "correct": false
+    },
+    {
+      "date": "2026-06-15",
+      "utc": "2026-06-15T16:00:00Z",
+      "home_team": "Spain",
+      "away_team": "Cape Verde",
+      "home_score": 0,
+      "away_score": 0,
+      "winner": "DRAW",
+      "duration": "REGULAR",
+      "actual_outcome": 1,
+      "predicted_outcome": 0,
+      "p_home": 0.7742,
+      "p_draw": 0.167,
+      "p_away": 0.0588,
+      "scorelines": [
+        [
+          2,
+          0,
+          0.1701
+        ],
+        [
+          1,
+          0,
+          0.1509
+        ],
+        [
+          3,
+          0,
+          0.1249
+        ],
+        [
+          2,
+          1,
+          0.0774
+        ],
+        [
+          1,
+          1,
+          0.0737
+        ]
+      ],
+      "correct": false
+    },
+    {
+      "date": "2026-06-15",
+      "utc": "2026-06-15T02:00:00Z",
+      "home_team": "Sweden",
+      "away_team": "Tunisia",
+      "home_score": 5,
+      "away_score": 1,
+      "winner": "HOME_TEAM",
+      "duration": "REGULAR",
+      "actual_outcome": 0,
+      "predicted_outcome": 0,
+      "p_home": 0.4738,
+      "p_draw": 0.265,
+      "p_away": 0.2613,
+      "scorelines": [
+        [
+          1,
+          1,
+          0.1263
+        ],
+        [
+          1,
+          0,
+          0.1039
+        ],
+        [
+          2,
+          1,
+          0.0935
+        ],
+        [
+          2,
+          0,
+          0.0855
+        ],
+        [
+          0,
+          0,
+          0.0767
+        ]
+      ],
+      "correct": true
+    },
+    {
+      "date": "2026-06-14",
+      "utc": "2026-06-14T23:00:00Z",
+      "home_team": "Ivory Coast",
+      "away_team": "Ecuador",
+      "home_score": 1,
+      "away_score": 0,
+      "winner": "HOME_TEAM",
+      "duration": "REGULAR",
+      "actual_outcome": 0,
+      "predicted_outcome": 2,
+      "p_home": 0.2142,
+      "p_draw": 0.2543,
+      "p_away": 0.5316,
+      "scorelines": [
+        [
+          1,
+          1,
+          0.1212
+        ],
+        [
+          0,
+          1,
+          0.1124
+        ],
+        [
+          0,
+          2,
+          0.0989
+        ],
+        [
+          1,
+          2,
+          0.0966
+        ],
+        [
+          0,
+          0,
+          0.0763
+        ]
+      ],
+      "correct": false
+    },
+    {
+      "date": "2026-06-14",
+      "utc": "2026-06-14T20:00:00Z",
+      "home_team": "Netherlands",
+      "away_team": "Japan",
+      "home_score": 2,
+      "away_score": 2,
+      "winner": "DRAW",
+      "duration": "REGULAR",
+      "actual_outcome": 1,
+      "predicted_outcome": 0,
+      "p_home": 0.4488,
+      "p_draw": 0.2458,
+      "p_away": 0.3054,
+      "scorelines": [
+        [
+          1,
+          1,
+          0.1124
+        ],
+        [
+          2,
+          1,
+          0.0918
+        ],
+        [
+          1,
+          2,
+          0.074
+        ],
+        [
+          1,
+          0,
+          0.072
+        ],
+        [
+          2,
+          0,
+          0.0664
+        ]
+      ],
+      "correct": false
+    },
+    {
+      "date": "2026-06-14",
+      "utc": "2026-06-14T17:00:00Z",
+      "home_team": "Germany",
+      "away_team": "Cura\u00e7ao",
+      "home_score": 7,
+      "away_score": 1,
+      "winner": "HOME_TEAM",
+      "duration": "REGULAR",
+      "actual_outcome": 0,
+      "predicted_outcome": 0,
+      "p_home": 0.8115,
+      "p_draw": 0.1394,
+      "p_away": 0.0491,
+      "scorelines": [
+        [
+          2,
+          0,
+          0.1598
+        ],
+        [
+          3,
+          0,
+          0.1326
+        ],
+        [
+          1,
+          0,
+          0.1254
+        ],
+        [
+          4,
+          0,
+          0.0825
+        ],
+        [
+          2,
+          1,
+          0.076
+        ]
+      ],
+      "correct": true
+    },
+    {
+      "date": "2026-06-14",
+      "utc": "2026-06-14T04:00:00Z",
+      "home_team": "Australia",
+      "away_team": "Turkey",
+      "home_score": 2,
+      "away_score": 0,
+      "winner": "HOME_TEAM",
+      "duration": "REGULAR",
+      "actual_outcome": 0,
+      "predicted_outcome": 2,
+      "p_home": 0.1981,
+      "p_draw": 0.2423,
+      "p_away": 0.5596,
+      "scorelines": [
+        [
+          1,
+          1,
+          0.1155
+        ],
+        [
+          0,
+          1,
+          0.1073
+        ],
+        [
+          0,
+          2,
+          0.1009
+        ],
+        [
+          1,
+          2,
+          0.0984
+        ],
+        [
+          0,
+          0,
+          0.0686
+        ]
+      ],
+      "correct": false
+    },
+    {
+      "date": "2026-06-14",
+      "utc": "2026-06-14T01:00:00Z",
+      "home_team": "Haiti",
+      "away_team": "Scotland",
+      "home_score": 0,
+      "away_score": 1,
+      "winner": "AWAY_TEAM",
+      "duration": "REGULAR",
+      "actual_outcome": 2,
+      "predicted_outcome": 2,
+      "p_home": 0.1745,
+      "p_draw": 0.2385,
+      "p_away": 0.587,
+      "scorelines": [
+        [
+          0,
+          1,
+          0.1172
+        ],
+        [
+          1,
+          1,
+          0.1136
+        ],
+        [
+          0,
+          2,
+          0.1109
+        ],
+        [
+          1,
+          2,
+          0.0979
+        ],
+        [
+          0,
+          0,
+          0.0732
+        ]
+      ],
+      "correct": true
+    },
+    {
+      "date": "2026-06-13",
+      "utc": "2026-06-13T22:00:00Z",
+      "home_team": "Brazil",
+      "away_team": "Morocco",
+      "home_score": 1,
+      "away_score": 1,
+      "winner": "DRAW",
+      "duration": "REGULAR",
+      "actual_outcome": 1,
+      "predicted_outcome": 0,
+      "p_home": 0.428,
+      "p_draw": 0.2484,
+      "p_away": 0.3236,
+      "scorelines": [
+        [
+          1,
+          1,
+          0.1138
+        ],
+        [
+          2,
+          1,
+          0.0899
+        ],
+        [
+          1,
+          2,
+          0.0769
+        ],
+        [
+          1,
+          0,
+          0.0709
+        ],
+        [
+          2,
+          2,
+          0.0638
+        ]
+      ],
+      "correct": false
+    },
+    {
+      "date": "2026-06-13",
+      "utc": "2026-06-13T19:00:00Z",
+      "home_team": "Qatar",
+      "away_team": "Switzerland",
+      "home_score": 1,
+      "away_score": 1,
+      "winner": "DRAW",
+      "duration": "REGULAR",
+      "actual_outcome": 1,
+      "predicted_outcome": 2,
+      "p_home": 0.0683,
+      "p_draw": 0.1666,
+      "p_away": 0.7651,
+      "scorelines": [
+        [
+          0,
+          2,
+          0.1549
+        ],
+        [
+          0,
+          1,
+          0.1323
+        ],
+        [
+          0,
+          3,
+          0.1176
+        ],
+        [
+          1,
+          2,
+          0.0837
+        ],
+        [
+          1,
+          1,
+          0.0772
+        ]
+      ],
+      "correct": false
+    },
     {
       "date": "2026-06-13",
       "utc": "2026-06-13T01:00:00Z",
@@ -11,11 +1559,39 @@
       "home_score": 4,
       "away_score": 1,
       "winner": "HOME_TEAM",
+      "duration": "REGULAR",
       "actual_outcome": 0,
       "predicted_outcome": 2,
-      "p_home": 0.3382,
-      "p_draw": 0.2491,
-      "p_away": 0.4127,
+      "p_home": 0.3447,
+      "p_draw": 0.2616,
+      "p_away": 0.3937,
+      "scorelines": [
+        [
+          1,
+          1,
+          0.1232
+        ],
+        [
+          1,
+          2,
+          0.0868
+        ],
+        [
+          2,
+          1,
+          0.0804
+        ],
+        [
+          0,
+          1,
+          0.0798
+        ],
+        [
+          1,
+          0,
+          0.0735
+        ]
+      ],
       "correct": false
     },
     {
@@ -26,11 +1602,39 @@
       "home_score": 1,
       "away_score": 1,
       "winner": "DRAW",
+      "duration": "REGULAR",
       "actual_outcome": 1,
       "predicted_outcome": 0,
-      "p_home": 0.5571,
-      "p_draw": 0.2432,
-      "p_away": 0.1997,
+      "p_home": 0.5781,
+      "p_draw": 0.2427,
+      "p_away": 0.1792,
+      "scorelines": [
+        [
+          1,
+          0,
+          0.119
+        ],
+        [
+          1,
+          1,
+          0.1155
+        ],
+        [
+          2,
+          0,
+          0.1103
+        ],
+        [
+          2,
+          1,
+          0.0975
+        ],
+        [
+          0,
+          0,
+          0.0758
+        ]
+      ],
       "correct": false
     },
     {
@@ -41,11 +1645,39 @@
       "home_score": 2,
       "away_score": 1,
       "winner": "HOME_TEAM",
+      "duration": "REGULAR",
       "actual_outcome": 0,
       "predicted_outcome": 2,
-      "p_home": 0.3061,
-      "p_draw": 0.2774,
-      "p_away": 0.4164,
+      "p_home": 0.3392,
+      "p_draw": 0.2568,
+      "p_away": 0.404,
+      "scorelines": [
+        [
+          1,
+          1,
+          0.1199
+        ],
+        [
+          1,
+          2,
+          0.0879
+        ],
+        [
+          2,
+          1,
+          0.0796
+        ],
+        [
+          0,
+          1,
+          0.0762
+        ],
+        [
+          1,
+          0,
+          0.0684
+        ]
+      ],
       "correct": false
     },
     {
@@ -56,11 +1688,39 @@
       "home_score": 2,
       "away_score": 0,
       "winner": "HOME_TEAM",
+      "duration": "REGULAR",
       "actual_outcome": 0,
       "predicted_outcome": 0,
-      "p_home": 0.6543,
-      "p_draw": 0.2273,
-      "p_away": 0.1184,
+      "p_home": 0.6716,
+      "p_draw": 0.211,
+      "p_away": 0.1174,
+      "scorelines": [
+        [
+          2,
+          0,
+          0.1343
+        ],
+        [
+          1,
+          0,
+          0.1305
+        ],
+        [
+          1,
+          1,
+          0.0996
+        ],
+        [
+          2,
+          1,
+          0.0941
+        ],
+        [
+          3,
+          0,
+          0.0889
+        ]
+      ],
       "correct": true
     }
   ]
