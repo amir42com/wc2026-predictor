@@ -1,6 +1,6 @@
 {
-  "created_utc": "2026-07-13T08:19:11+00:00",
-  "code_git_sha": "018c6c3b7d1b80a0ac17a661b71d5b808f0e2ca3",
+  "created_utc": "2026-07-13T09:00:19+00:00",
+  "code_git_sha": "7901f4faac8e84824016ae98f79bc988282a384b",
   "bundle_file": "xgb_wc2026.joblib",
   "bundle_sha256": "52752a62a0ac53e927e65ac37faeef6bb24c68591891ebd78d8721eb6ee9eb4d",
   "training_rows": 49404,
@@ -9,6 +9,7 @@
   "elo_blend_w": 0.75,
   "elo_draw_rate": 0.227,
   "hfa_elo": 125.58,
+  "dixon_coles_rho": -0.05,
   "best_iteration": 175,
   "n_features": 31,
   "xgboost_version": "3.2.0",

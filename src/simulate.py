@@ -23,6 +23,7 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from scorelines import scoreline_grid
 from train import ELO_BLEND_W, elo_prior_proba, make_X, predict_neutral_proba
 from third_place_mapping import lookup as annexe_c_lookup, check_eligibility
 
@@ -268,97 +269,174 @@ def _safe_p(p: np.ndarray) -> np.ndarray:
     return p / s
 
 
-def _score_for_outcome(outcome: int, rng: np.random.Generator) -> tuple[int, int]:
-    """Sample a plausible scoreline given the match outcome (0/1/2)."""
+def _scoreline_grid_for(predictor: Predictor, home: str, away: str) -> np.ndarray:
+    """
+    Dixon-Coles scoreline grid consistent with the predictor's W/D/L for this
+    pair, cached per unordered pair (the lambda solve is the expensive part).
+    grid[i, j] = P(home scores i, away scores j).
+    """
+    cache = getattr(predictor, "_scoreline_grids", None)
+    if cache is None:
+        cache = {}
+        predictor._scoreline_grids = cache
+    a, b = sorted([home, away])
+    if (a, b) not in cache:
+        p = _safe_p(predictor.predict(a, b))
+        cache[(a, b)] = scoreline_grid(p[0], p[1], p[2])[0]
+    g = cache[(a, b)]
+    return g if home == a else g.T
+
+
+def sample_scoreline(grid: np.ndarray, outcome: int,
+                     rng: np.random.Generator) -> tuple[int, int]:
+    """
+    Sample a scoreline from the DC grid CONDITIONAL on the already-sampled
+    W/D/L outcome: restrict the grid to the outcome's region (home-win lower
+    triangle / draw diagonal / away-win upper triangle), renormalise, sample
+    one cell. Points, GD and GF all derive from this one scoreline, so a
+    decisive outcome can never carry a level scoreline (and vice versa).
+    """
+    n = grid.shape[0]
     if outcome == 0:
-        return int(1 + rng.poisson(0.8)), int(rng.poisson(0.5))
-    if outcome == 1:
-        g = int(rng.poisson(1.0))
-        return g, g
-    return int(rng.poisson(0.5)), int(1 + rng.poisson(0.8))
+        mask = np.tril(np.ones((n, n)), -1)
+    elif outcome == 1:
+        mask = np.eye(n)
+    else:
+        mask = np.triu(np.ones((n, n)), 1)
+    flat = (grid * mask).ravel()
+    total = flat.sum()
+    if total <= 0:   # degenerate grid: fall back to the minimal consistent score
+        return (1, 0) if outcome == 0 else ((0, 0) if outcome == 1 else (0, 1))
+    idx = int(rng.choice(len(flat), p=flat / total))
+    i, j = divmod(idx, n)
+    return int(i), int(j)
+
+
+def _mini_table(team_names: list[str],
+                results: list[tuple[str, str, int, int]]) -> dict[str, tuple]:
+    """(pts, gd, gf) per team over the results BETWEEN the given teams only."""
+    names = set(team_names)
+    t = {x: [0, 0, 0] for x in team_names}
+    for home, away, hg, ag in results:
+        if home not in names or away not in names:
+            continue
+        t[home][1] += hg - ag; t[home][2] += hg
+        t[away][1] += ag - hg; t[away][2] += ag
+        if hg > ag:
+            t[home][0] += 3
+        elif hg == ag:
+            t[home][0] += 1; t[away][0] += 1
+        else:
+            t[away][0] += 3
+    return {x: tuple(v) for x, v in t.items()}
+
+
+def _rank_tied(cluster: list[dict], results: list, rng: np.random.Generator) -> list[dict]:
+    """
+    Rank a set of teams tied on ALL overall criteria (pts, GD, GF) per the
+    FIFA 2026 regulations' among-tied-teams block: points, then goal
+    difference, then goals scored in the matches BETWEEN the tied teams —
+    REAPPLIED to any subset that remains tied after a partial separation.
+    When the mini-table separates nothing, the remaining criteria (fair-play
+    conduct points, FIFA drawing of lots) are unavailable to a simulator, so
+    a documented RANDOM DRAW stands in for them.
+    """
+    if len(cluster) <= 1:
+        return cluster
+    names = [r["team"] for r in cluster]
+    mini = _mini_table(names, results)
+    ordered = sorted(cluster, key=lambda r: mini[r["team"]], reverse=True)
+
+    runs: list[list[dict]] = []
+    for r in ordered:
+        if runs and mini[runs[-1][-1]["team"]] == mini[r["team"]]:
+            runs[-1].append(r)
+        else:
+            runs.append([r])
+
+    if len(runs) == 1:
+        # Mini-table fully tied: random draw stands in for fair play / lots.
+        rng.shuffle(cluster)
+        return cluster
+    out: list[dict] = []
+    for run in runs:
+        # Reapplication: criteria d-f re-run on the still-tied subset only.
+        out.extend(_rank_tied(run, results, rng))
+    return out
+
+
+def _rank_group(records: dict[str, dict], results: list,
+                rng: np.random.Generator) -> list[dict]:
+    """
+    FIFA 2026 group ranking. Overall criteria first — points, goal
+    difference, goals scored (the lexicographic sort) — then the
+    among-tied-teams block with reapplication (_rank_tied), then the
+    documented random fallback. NOTE: the regulations rank overall GD/GF
+    ABOVE head-to-head (unlike UEFA); flipping that order is a one-line
+    change to the sort key below if ever ruled otherwise.
+    """
+    standings = sorted(records.values(),
+                       key=lambda r: (r["pts"], r["gd"], r["gf"]), reverse=True)
+    final: list[dict] = []
+    i = 0
+    while i < len(standings):
+        j = i + 1
+        while j < len(standings) and (
+            (standings[j]["pts"], standings[j]["gd"], standings[j]["gf"])
+            == (standings[i]["pts"], standings[i]["gd"], standings[i]["gf"])
+        ):
+            j += 1
+        final.extend(_rank_tied(standings[i:j], results, rng))
+        i = j
+    return final
 
 
 def simulate_group(
     teams: list[str],
     predictor: Predictor,
     rng: np.random.Generator,
+    completed: "list[tuple[str, str, int, int]] | None" = None,
 ) -> list[dict]:
     """
-    Simulate a 4-team round-robin.  Returns standings sorted by:
-    points → goal-diff → goals-for → head-to-head (points, then goal-diff)
-    → random shuffle, applied ONLY to teams still tied after head-to-head.
-    Each record: {team, pts, gd, gf, h2h_pts, h2h_gd, group}.
+    Simulate a 4-team round-robin. `completed` (remaining-tournament
+    forecast): (home, away, home_goals, away_goals) FACTS for already-played
+    fixtures in this group — those matches are not simulated, their real
+    scores enter the table, and only the remaining fixtures sample from the
+    model. Scorelines come from the Dixon-Coles grid conditional on the
+    sampled W/D/L (sample_scoreline), so points/GD/GF are all consequences of
+    one sampled score. Ranking per _rank_group (FIFA 2026 criteria).
     """
     rec = {t: {"team": t, "pts": 0, "gd": 0, "gf": 0} for t in teams}
-    h2h_pts: dict[str, dict[str, int]] = {t: {o: 0 for o in teams if o != t} for t in teams}
-    h2h_gd:  dict[str, dict[str, int]] = {t: {o: 0 for o in teams if o != t} for t in teams}
+    results: list[tuple[str, str, int, int]] = []
 
-    for home, away in combinations(teams, 2):
-        p = _safe_p(predictor.predict(home, away))
-        outcome = int(rng.choice(3, p=p))
-        hg, ag = _score_for_outcome(outcome, rng)
+    done: dict[frozenset, tuple[str, str, int, int]] = {}
+    for home, away, hg, ag in (completed or []):
+        if home not in rec or away not in rec:
+            raise ValueError(f"completed result {home} v {away} not in group {teams}")
+        done[frozenset({home, away})] = (home, away, int(hg), int(ag))
+
+    for a, b in combinations(teams, 2):
+        key = frozenset({a, b})
+        if key in done:
+            home, away, hg, ag = done[key]
+        else:
+            home, away = a, b
+            p = _safe_p(predictor.predict(home, away))
+            outcome = int(rng.choice(3, p=p))
+            hg, ag = sample_scoreline(
+                _scoreline_grid_for(predictor, home, away), outcome, rng)
+        results.append((home, away, hg, ag))
 
         rec[home]["gd"] += hg - ag;  rec[home]["gf"] += hg
         rec[away]["gd"] += ag - hg;  rec[away]["gf"] += ag
-        h2h_gd[home][away] += hg - ag
-        h2h_gd[away][home] += ag - hg
-
-        if outcome == 0:
-            rec[home]["pts"]      += 3
-            h2h_pts[home][away]   += 3
-        elif outcome == 1:
-            rec[home]["pts"]      += 1;  rec[away]["pts"]      += 1
-            h2h_pts[home][away]   += 1;  h2h_pts[away][home]   += 1
+        if hg > ag:
+            rec[home]["pts"] += 3
+        elif hg == ag:
+            rec[home]["pts"] += 1;  rec[away]["pts"] += 1
         else:
-            rec[away]["pts"]      += 3
-            h2h_pts[away][home]   += 3
+            rec[away]["pts"] += 3
 
-    standings = sorted(rec.values(), key=lambda r: (r["pts"], r["gd"], r["gf"]), reverse=True)
-
-    # Break ties within equal-score clusters using H2H then random
-    final: list[dict] = []
-    i = 0
-    while i < len(standings):
-        j = i + 1
-        while j < len(standings) and (
-            standings[j]["pts"] == standings[i]["pts"]
-            and standings[j]["gd"]  == standings[i]["gd"]
-            and standings[j]["gf"]  == standings[i]["gf"]
-        ):
-            j += 1
-        cluster = standings[i:j]
-        if len(cluster) > 1:
-            cluster_teams = [r["team"] for r in cluster]
-
-            def h2h_key(r: dict) -> tuple[int, int]:
-                # Mini-table among the tied teams only: H2H points, then H2H GD.
-                others = [o for o in cluster_teams if o != r["team"]]
-                return (sum(h2h_pts[r["team"]][o] for o in others),
-                        sum(h2h_gd[r["team"]][o] for o in others))
-
-            cluster.sort(key=h2h_key, reverse=True)
-
-            # Random tiebreak ONLY within sub-groups that are STILL tied after
-            # head-to-head — never reshuffle the whole cluster (that would undo
-            # the H2H ordering). Shuffling each tied run independently keeps the
-            # H2H ranking between runs and stays deterministic given the rng.
-            resolved: list[dict] = []
-            k = 0
-            while k < len(cluster):
-                m = k + 1
-                while m < len(cluster) and h2h_key(cluster[m]) == h2h_key(cluster[k]):
-                    m += 1
-                tied = cluster[k:m]
-                if len(tied) > 1:
-                    rng.shuffle(tied)
-                resolved.extend(tied)
-                k = m
-            cluster = resolved
-
-        final.extend(cluster)
-        i = j
-
-    return final
+    return _rank_group(rec, results, rng)
 
 
 # ── R32 bracket resolver ───────────────────────────────────────────────────
@@ -367,15 +445,22 @@ def _table_key(record: dict) -> tuple:
     return (record["pts"], record["gd"], record["gf"])
 
 
-def resolve_r32(group_tables: dict[str, list[dict]]) -> list[tuple[str, str]]:
+def resolve_r32(group_tables: dict[str, list[dict]],
+                rng: "np.random.Generator | None" = None) -> list[tuple[str, str]]:
     """
     Map R32 slot strings to actual team names using the official FIFA World Cup
     2026 Annexe C third-place table (src/third_place_mapping.py).
 
-    The 8 best third-place teams qualify (ranked by points -> goal-diff ->
-    goals-for, unchanged); the sorted letters of their groups form the Annexe C
-    key, and the table dictates EXACTLY which qualifying third each group winner
-    faces. There is no greedy heuristic and no fallback: an invalid or unknown
+    The 8 best third-place teams qualify, ranked points -> goal-diff ->
+    goals-for; thirds still tied after goals-for are separated by a RANDOM
+    draw (the documented stand-in for the regulations' fair-play-conduct and
+    drawing-of-lots criteria, which a simulator cannot know). Ties must NEVER
+    fall through to incidental group-letter order — that silently favoured
+    early-alphabet groups in every simulation (pre-remediation defect).
+
+    The sorted letters of the qualified groups form the Annexe C key, and the
+    table dictates EXACTLY which qualifying third each group winner faces.
+    There is no greedy heuristic and no fallback: an invalid or unknown
     combination raises (annexe_c_lookup validates the 8 distinct A-L letters).
     Group-winner (1X) and runner-up (2X) resolution is unchanged.
     """
@@ -383,8 +468,13 @@ def resolve_r32(group_tables: dict[str, list[dict]]) -> list[tuple[str, str]]:
     runners = {g: t[1]["team"] for g, t in group_tables.items()}
     thirds  = {g: t[2]         for g, t in group_tables.items()}
 
-    # The 8 best third-place records qualify (points -> GD -> GF).
-    ranked = sorted(thirds.items(), key=lambda x: _table_key(x[1]), reverse=True)
+    # The 8 best third-place records qualify (points -> GD -> GF -> random
+    # draw for residual ties; never group-letter order).
+    if rng is None:
+        rng = np.random.default_rng(0)
+    jitter = {g: rng.random() for g in sorted(thirds)}
+    ranked = sorted(thirds.items(),
+                    key=lambda x: (*_table_key(x[1]), jitter[x[0]]), reverse=True)
     qualified = [g for g, _ in ranked[:8]]
 
     # Official Annexe C assignment for this exact set of eight groups:
@@ -430,10 +520,21 @@ def play_round(
     rng: np.random.Generator,
     label: str = "",
     verbose: bool = False,
+    known: "dict[int, str] | None" = None,
 ) -> list[str]:
+    """`known` (remaining-tournament forecast): match-index -> real winner for
+    fixtures already decided; those are facts, not simulated."""
     winners = []
-    for a, b in matches:
-        w = knockout_match(a, b, predictor, rng)
+    for i, (a, b) in enumerate(matches):
+        if known and i in known:
+            w = known[i]
+            if w not in (a, b):
+                raise ValueError(
+                    f"{label or 'KO'} match {i}: recorded winner {w!r} is not "
+                    f"one of the pairing ({a!r}, {b!r}) — tournament state is "
+                    f"inconsistent with the simulated bracket path")
+        else:
+            w = knockout_match(a, b, predictor, rng)
         winners.append(w)
         if verbose:
             print(f"    {a:30s} vs {b:30s}  ->  {w}")
@@ -442,24 +543,62 @@ def play_round(
 
 # ── Full tournament simulation ─────────────────────────────────────────────
 
+def _group_facts(state: "dict | None") -> dict[str, list]:
+    """Split state['group_results'] facts by group membership (validated)."""
+    facts: dict[str, list] = {g: [] for g in GROUPS}
+    if not state:
+        return facts
+    membership = {t: g for g, ts in GROUPS.items() for t in ts}
+    for home, away, hg, ag in state.get("group_results", []):
+        gh, ga = membership.get(home), membership.get(away)
+        if gh is None or ga is None or gh != ga:
+            raise ValueError(f"group result {home} v {away}: not a same-group pairing")
+        facts[gh].append((home, away, hg, ag))
+    return facts
+
+
 def simulate_tournament(
     predictor: Predictor,
     rng: np.random.Generator,
     verbose: bool = False,
     rounds: dict[str, Counter] | None = None,
+    state: "dict | None" = None,
 ) -> str:
-    """If `rounds` is given, count each team's appearance per knockout stage."""
+    """
+    If `rounds` is given, count each team's appearance per knockout stage.
+
+    `state` turns the run into a REMAINING-TOURNAMENT FORECAST: played matches
+    enter as facts, only remaining fixtures are simulated, and team ratings
+    stay frozen at the pre-tournament snapshot (deliberately — mid-tournament
+    rating updates would silently rebuild the model). Keys, all optional:
+      "group_results": [(home, away, home_goals, away_goals), ...]
+      "r32_pairs":     the REAL 16 R32 pairings (facts) — supply these when
+                       the group stage is complete, because reality has
+                       already resolved the tiebreak/lots randomness that
+                       resolve_r32 would otherwise re-sample;
+      "ko_winners":    {"R32": {match_idx: winner}, "R16": ..., "QF": ...,
+                        "SF": ..., "Final": {0: winner}}
+    """
+    facts = _group_facts(state)
+    ko_known = (state or {}).get("ko_winners", {})
+
     # Group stage
     group_tables: dict[str, list[dict]] = {}
     for grp, teams in GROUPS.items():
-        group_tables[grp] = simulate_group(teams, predictor, rng)
+        group_tables[grp] = simulate_group(teams, predictor, rng,
+                                           completed=facts[grp])
         if verbose:
             print(f"  Group {grp}:")
             for rank, row in enumerate(group_tables[grp]):
                 q = " *" if rank < 2 else ("  (3rd)" if rank == 2 else "")
                 print(f"    {rank+1}. {row['team']:<30s} {row['pts']}pts  GD{row['gd']:+d}{q}")
 
-    r32 = resolve_r32(group_tables)
+    if state and state.get("r32_pairs"):
+        r32 = [tuple(p) for p in state["r32_pairs"]]
+        if len(r32) != 16:
+            raise ValueError("r32_pairs must list all 16 pairings")
+    else:
+        r32 = resolve_r32(group_tables, rng)
     if rounds is not None:
         for a, b in r32:
             rounds["R32"][a] += 1
@@ -467,33 +606,43 @@ def simulate_tournament(
 
     if verbose:
         print(f"\n  Round of 32:")
-    r32w = play_round(r32, predictor, rng, verbose=verbose)
+    r32w = play_round(r32, predictor, rng, "R32", verbose,
+                      known=ko_known.get("R32"))
     if rounds is not None:
         rounds["R16"].update(r32w)
 
     r16 = [(r32w[i], r32w[j]) for i, j in R16_PAIRS]
     if verbose:
         print(f"\n  Round of 16:")
-    r16w = play_round(r16, predictor, rng, verbose=verbose)
+    r16w = play_round(r16, predictor, rng, "R16", verbose,
+                      known=ko_known.get("R16"))
     if rounds is not None:
         rounds["QF"].update(r16w)
 
     qf = [(r16w[i], r16w[j]) for i, j in QF_PAIRS]
     if verbose:
         print(f"\n  Quarter-finals:")
-    qfw = play_round(qf, predictor, rng, verbose=verbose)
+    qfw = play_round(qf, predictor, rng, "QF", verbose,
+                     known=ko_known.get("QF"))
     if rounds is not None:
         rounds["SF"].update(qfw)
 
     sf = [(qfw[i], qfw[j]) for i, j in SF_PAIRS]
     if verbose:
         print(f"\n  Semi-finals:")
-    sfw = play_round(sf, predictor, rng, verbose=verbose)
+    sfw = play_round(sf, predictor, rng, "SF", verbose,
+                     known=ko_known.get("SF"))
     if rounds is not None:
         rounds["Final"].update(sfw)
 
     finalist_a, finalist_b = sfw[0], sfw[1]
-    champion = knockout_match(finalist_a, finalist_b, predictor, rng)
+    final_known = ko_known.get("Final", {})
+    if 0 in final_known:
+        champion = final_known[0]
+        if champion not in (finalist_a, finalist_b):
+            raise ValueError("recorded champion is not one of the finalists")
+    else:
+        champion = knockout_match(finalist_a, finalist_b, predictor, rng)
     if rounds is not None:
         rounds["Champion"][champion] += 1
     if verbose:
@@ -508,12 +657,18 @@ ROUND_NAMES = ["R32", "R16", "QF", "SF", "Final", "Champion"]
 
 
 def monte_carlo(n: int, predictor: Predictor, seed: int = 42,
-                track_rounds: bool = False):
+                track_rounds: bool = False, state: "dict | None" = None):
     """
     Returns Counter of champions; with track_rounds=True returns
     (champions, rounds) where rounds maps stage name -> Counter of teams
-    that reached it.
+    that reached it. With `state`, every run is a REMAINING-TOURNAMENT
+    FORECAST conditioned on the recorded facts (see simulate_tournament).
     """
+    if state:
+        print("  MODE: remaining-tournament forecast — "
+              f"{len(state.get('group_results', []))} group results, "
+              f"{sum(len(v) for v in state.get('ko_winners', {}).values())} "
+              "knockout results enter as facts; ratings frozen pre-tournament.")
     rng  = np.random.default_rng(seed)
     wins: Counter = Counter()
     rounds: dict[str, Counter] | None = (
@@ -521,7 +676,7 @@ def monte_carlo(n: int, predictor: Predictor, seed: int = 42,
     )
     step = max(1, n // 10)
     for i in range(n):
-        wins[simulate_tournament(predictor, rng, rounds=rounds)] += 1
+        wins[simulate_tournament(predictor, rng, rounds=rounds, state=state)] += 1
         if (i + 1) % step == 0:
             print(f"  {i+1:>6,} / {n:,} simulations done ...", flush=True)
     if track_rounds:
