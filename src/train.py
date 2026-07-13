@@ -23,6 +23,7 @@ Usage:
 """
 
 import argparse
+from dataclasses import dataclass
 from pathlib import Path
 
 import joblib
@@ -79,6 +80,36 @@ WC_BACKTEST_YEARS = [2014, 2018, 2022]
 ELO_BLEND_W   = 0.75   # XGB share of the blend
 ELO_DRAW_RATE = 0.227  # historical draw share used by the prior
 
+# Venue contract (remediation Phase 2): the pipeline's Elo is venue-blind, so
+# when a match is NOT neutral the Elo-logistic prior receives a fixed
+# home-advantage offset. Fitted ONCE by maximum likelihood on the canonical
+# pre-cutoff training data (fit_hfa_elo below: non-neutral matches only; the
+# prior's draw share is outcome-independent of the offset, so draws are
+# uninformative and the fit reduces to home-win vs away-win). The value is a
+# frozen production constant with recorded provenance — like ELO_DRAW_RATE, it
+# is NOT tuned against any published metric, and the Phase 4 backtest must
+# report per-fold refits as a sensitivity line, mirroring the draw-rate
+# treatment. Fitted 2026-07-13 on canonical features.csv (hashes in
+# reports/remediation_phase1.md); tests/test_match_context.py re-runs the fit.
+HFA_ELO = 125.58  # MLE on 36,346 non-neutral canonical rows (28,038 decided)
+
+
+@dataclass(frozen=True)
+class MatchContext:
+    """
+    Explicit venue/inference context for one fixture (remediation Phase 2).
+
+    Invariant (upstream martj42 semantics, verified on all non-neutral WC
+    rows): when `neutral` is False, `home_team` IS the side receiving home
+    advantage. `venue_country` is evidence for deriving `neutral` (and for
+    audit); it is never fed to the model.
+    """
+    home_team: str
+    away_team: str
+    neutral: bool
+    venue_country: "str | None" = None
+    is_world_cup: bool = True
+
 
 def elo_prior_proba(elo_home: float, elo_away: float,
                     draw_rate: float = ELO_DRAW_RATE) -> np.ndarray:
@@ -88,33 +119,92 @@ def elo_prior_proba(elo_home: float, elo_away: float,
     return p / p.sum()
 
 
+def fit_hfa_elo(features_df: pd.DataFrame) -> float:
+    """
+    Maximum-likelihood home-advantage offset (in Elo points) for the prior.
+
+    Recipe (deterministic, canonical data only): take every non-neutral row of
+    the canonical features.csv (pre-cutoff by construction), model the home
+    side's win probability among decided matches as the Elo expectation with
+    the home rating shifted by `h`, and maximize the log-likelihood over h in
+    [0, 400]. Under the elo_prior_proba form the draw share is a constant
+    factor independent of h, so drawn matches contribute nothing to the
+    gradient and only home wins / away wins enter.
+    """
+    from scipy.optimize import minimize_scalar
+
+    nn = features_df[features_df["neutral"] == 0]
+    diff = nn["elo_diff"].to_numpy(dtype=float)
+    home_win = (nn["outcome"] == 0).to_numpy()
+    away_win = (nn["outcome"] == 2).to_numpy()
+
+    def neg_ll(h: float) -> float:
+        e = 1.0 / (1.0 + 10.0 ** (-(diff + h) / 400.0))
+        return -(np.log(e[home_win]).sum() + np.log(1.0 - e[away_win]).sum())
+
+    res = minimize_scalar(neg_ll, bounds=(0.0, 400.0), method="bounded",
+                          options={"xatol": 1e-6})
+    return float(res.x)
+
+
+def predict_match_proba(model, build_x, ctx: MatchContext,
+                        elo_home: float, elo_away: float,
+                        blend_weight: float = ELO_BLEND_W,
+                        draw_rate: float = ELO_DRAW_RATE,
+                        hfa_elo: "float | None" = None) -> np.ndarray:
+    """
+    THE single deployed inference, shared by the Streamlit predictor, the
+    tracker, the simulator and the backtest so all evaluate the exact same
+    procedure. The venue treatment is governed entirely by `ctx` (MatchContext).
+
+    `build_x(home, away, neutral)` is supplied by the caller and returns a
+    single-row feature matrix aligned to the model's feature columns (the
+    caller owns X construction — team-state reconstruction for serving,
+    recorded-row re-orientation for the backtest).
+
+    Neutral fixture (ctx.neutral=True — orientation is bookkeeping):
+      1. predict_proba for home-vs-away and away-vs-home, both with neutral=1,
+      2. reverse the second vector ([2,1,0]) back to home's perspective,
+      3. average the two (cancels the model's residual home/away asymmetry),
+      4. shrink toward the symmetric Elo-logistic prior at `blend_weight`.
+
+    Non-neutral fixture (ctx.home_team has real home advantage):
+      1. a SINGLE orientation — ctx.home_team in the home slot, neutral=0
+         (symmetry-averaging would erase exactly the advantage being modelled),
+      2. shrink toward the Elo-logistic prior with the home rating shifted by
+         `hfa_elo` (default: the frozen production constant HFA_ELO).
+
+    `elo_home`/`elo_away` follow ctx.home_team/ctx.away_team. Returns
+    P(home win, draw, away win), summing to 1.
+    """
+    if ctx.neutral:
+        p_ab = model.predict_proba(build_x(ctx.home_team, ctx.away_team, 1))[0]
+        p_ba = model.predict_proba(build_x(ctx.away_team, ctx.home_team, 1))[0]
+        p_model = (p_ab + p_ba[[2, 1, 0]]) / 2.0
+        prior = elo_prior_proba(elo_home, elo_away, draw_rate)
+    else:
+        h = HFA_ELO if hfa_elo is None else hfa_elo
+        p_model = model.predict_proba(build_x(ctx.home_team, ctx.away_team, 0))[0]
+        prior = elo_prior_proba(elo_home + h, elo_away, draw_rate)
+    blended = blend_weight * p_model + (1.0 - blend_weight) * prior
+    return blended / blended.sum()
+
+
 def predict_neutral_proba(model, build_x, team_a: str, team_b: str,
                           elo_a: float, elo_b: float,
                           blend_weight: float = ELO_BLEND_W,
                           draw_rate: float = ELO_DRAW_RATE) -> np.ndarray:
     """
-    THE single deployed neutral-venue inference, shared by the Streamlit
-    predictor, the tracker, the simulator and the backtest so all evaluate the
-    exact same procedure.
-
-    `build_x(home, away)` is supplied by the caller and returns a single-row
-    feature matrix aligned to the model's feature columns (the caller owns X
-    construction — team-state reconstruction for serving, recorded-row
-    re-orientation for the backtest). The steps:
-
-      1. predict_proba for A-vs-B and B-vs-A,
-      2. reverse the second vector ([2,1,0]) back to A's perspective,
-      3. average the two (cancels the model's residual home/away asymmetry),
-      4. shrink toward the Elo-logistic prior at `blend_weight`.
-
-    Returns P(team_a win, draw, team_b win), summing to 1.
+    DEPRECATED shim — the pre-Phase-2 neutral-only inference, kept so the
+    frozen serving path (simulate.Predictor, tracker, app) is byte-identical
+    until the serving rebuild phase. `build_x(home, away)` is the legacy
+    two-argument contract; the neutral flag it hardcodes internally is what
+    the neutral path fed the model before the contract existed. New code must
+    construct a MatchContext and call predict_match_proba.
     """
-    p_ab = model.predict_proba(build_x(team_a, team_b))[0]
-    p_ba = model.predict_proba(build_x(team_b, team_a))[0]
-    p_model = (p_ab + p_ba[[2, 1, 0]]) / 2.0
-    prior = elo_prior_proba(elo_a, elo_b, draw_rate)
-    blended = blend_weight * p_model + (1.0 - blend_weight) * prior
-    return blended / blended.sum()
+    ctx = MatchContext(team_a, team_b, neutral=True)
+    return predict_match_proba(model, lambda h, a, _n: build_x(h, a), ctx,
+                               elo_a, elo_b, blend_weight, draw_rate)
 
 
 def make_X(df: pd.DataFrame, feature_cols: list[str] | None = None) -> tuple[pd.DataFrame, list[str]]:
