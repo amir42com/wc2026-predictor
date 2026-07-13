@@ -1,0 +1,16 @@
+{
+  "created_utc": "2026-07-13T08:19:11+00:00",
+  "code_git_sha": "018c6c3b7d1b80a0ac17a661b71d5b808f0e2ca3",
+  "bundle_file": "xgb_wc2026.joblib",
+  "bundle_sha256": "52752a62a0ac53e927e65ac37faeef6bb24c68591891ebd78d8721eb6ee9eb4d",
+  "training_rows": 49404,
+  "features_csv_sha256": "cdbfc5a6bcc83a6b71f57db1fcf674ec4acad1d5e0e9e1c9ca44b029bc56136d",
+  "raw_results_sha256": "59f49de6055179ebe8c7f4d9f31b579c938f9eafd25e925abdffd91885f08e43",
+  "elo_blend_w": 0.75,
+  "elo_draw_rate": 0.227,
+  "hfa_elo": 125.58,
+  "best_iteration": 175,
+  "n_features": 31,
+  "xgboost_version": "3.2.0",
+  "blend_weight_search": "reports/blend_weight_search.csv"
+}
