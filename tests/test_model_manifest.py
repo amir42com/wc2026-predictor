@@ -39,6 +39,8 @@ def test_manifest_matches_reality():
     assert m["elo_blend_w"] == train.ELO_BLEND_W
     assert m["elo_draw_rate"] == train.ELO_DRAW_RATE
     assert m["hfa_elo"] == train.HFA_ELO
+    import scorelines
+    assert m["dixon_coles_rho"] == scorelines.DIXON_COLES_RHO
 
     # The referenced blend-weight-search artifact must exist.
     assert (ROOT / m["blend_weight_search"]).exists()

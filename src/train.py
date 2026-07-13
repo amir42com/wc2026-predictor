@@ -386,6 +386,12 @@ def _print_backtest_table(df: pd.DataFrame) -> None:
     print(sep)
 
 
+def _dixon_coles_rho() -> float:
+    """Scoreline-layer constant, imported lazily (scorelines pulls scipy)."""
+    from scorelines import DIXON_COLES_RHO
+    return DIXON_COLES_RHO
+
+
 def write_manifest(bundle_path: Path, model, feature_cols: list[str],
                    n_train_rows: int) -> Path:
     """
@@ -423,6 +429,7 @@ def write_manifest(bundle_path: Path, model, feature_cols: list[str],
         "elo_blend_w": ELO_BLEND_W,
         "elo_draw_rate": ELO_DRAW_RATE,
         "hfa_elo": HFA_ELO,
+        "dixon_coles_rho": _dixon_coles_rho(),
         "best_iteration": int(model.best_iteration),
         "n_features": len(feature_cols),
         "xgboost_version": xgboost.__version__,

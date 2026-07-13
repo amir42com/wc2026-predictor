@@ -87,6 +87,17 @@ into the constant's favour). Metric impact: Blend LL 0.98189 vs 0.98182
 (+0.00007); Elo accuracy 55.73% vs 56.25% (one pick). The HFA window choice
 is immaterial to every benchmark conclusion.
 
+## Phase 8 directives (recorded at Checkpoint 4 approval)
+
+1. The asymmetric protocol effect (blend −3.12pp vs Elo −1.56pp accuracy)
+   gets its own NAMED paragraph in the article: the rolling evaluation
+   specifically flattered the recency-feature model. A finding, not a
+   footnote.
+2. The p=0.58 → 0.21 shift is protocol change, not evidence accumulation —
+   the article must not narrate it as a trend toward significance. The
+   zero-draws claim updates to 1/0/0 (XGB/Blend/Elo hard draw picks of 192,
+   41 actual draws).
+
 ## Not done here (by design)
 
 Figures (Phase 7) — `figure5_by_tournament.png` and the make_figures set were
