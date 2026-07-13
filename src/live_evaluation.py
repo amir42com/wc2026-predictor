@@ -227,13 +227,17 @@ def load_results_from_cache() -> list[dict]:
 
 
 def fixture_slug(m: dict) -> str:
+    """Stable fixture ID for a cache record: knockout fixtures in the ledger
+    registry map to their official M-number BY KICKOFF DATE — every registry
+    fixture (M101 2026-07-14, M102 2026-07-15, M103 2026-07-18, M104
+    2026-07-19) sits alone on its date, and these IDs must match the ledger's
+    exactly or finished semifinals would silently fall to the date-team
+    fallback and never join their prospective entries (post-push review bug).
+    Everything else gets the date-teams slug used by the retrospective tier."""
     from prediction_ledger import FIXTURES
-    for fid, info in FIXTURES.items():
+    for fid, info in sorted(FIXTURES.items()):
         if m["date"] == info["kickoff_date"]:
-            # date-unique fixtures only (M103/M104); SF days could collide if
-            # schedules shift — the slug fallback below stays unambiguous.
-            if fid in ("M103", "M104"):
-                return f"WC2026-{fid}"
+            return f"WC2026-{fid}"
     return f"WC2026-{m['date']}-{m['home_team']}-v-{m['away_team']}"
 
 
