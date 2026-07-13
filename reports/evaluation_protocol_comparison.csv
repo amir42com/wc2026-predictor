@@ -1,0 +1,21 @@
+# Protocol decomposition (remediation Phase 4). Deltas, per system:
+#   A->B0 data/ordering (Phase 1 dedupe + deterministic sort)
+#   B0->B1 venue contract (Phase 2: host rows + HFA, both systems)
+#   B1->C  state protocol (rolling recorded rows -> ONE frozen
+#          pre-tournament snapshot)
+# A is copied verbatim from reports/remediation_baseline.md. C is read
+# from reports/backtest_predictions.csv (the canonical benchmark).
+# Rolling variants are sensitivity runs, never headline numbers.
+variant,data,row_ordering,state_protocol,venue_contract,system,n,accuracy,log_loss,brier
+A_published,pre-remediation,unstable,rolling,none,Raw XGBoost,192,0.562500,0.976240,0.575773
+A_published,pre-remediation,unstable,rolling,none,Blend,192,0.562500,0.972037,0.573491
+A_published,pre-remediation,unstable,rolling,none,Elo,192,0.578125,0.976894,0.577025
+B0_rolling_legacy,canonical,deterministic,rolling,none,Raw XGBoost,192,0.562500,0.973866,0.575365
+B0_rolling_legacy,canonical,deterministic,rolling,none,Blend,192,0.562500,0.970647,0.573561
+B0_rolling_legacy,canonical,deterministic,rolling,none,Elo,192,0.578125,0.976898,0.577028
+B1_rolling_venue,canonical,deterministic,rolling,phase2,Raw XGBoost,192,0.552083,0.981817,0.580932
+B1_rolling_venue,canonical,deterministic,rolling,phase2,Blend,192,0.546875,0.978285,0.578951
+B1_rolling_venue,canonical,deterministic,rolling,phase2,Elo,192,0.567708,0.984521,0.582347
+C_frozen_venue,canonical,deterministic,frozen,phase2,Raw XGBoost,192,0.536458,0.986162,0.584111
+C_frozen_venue,canonical,deterministic,frozen,phase2,Blend,192,0.531250,0.981818,0.581550
+C_frozen_venue,canonical,deterministic,frozen,phase2,Elo,192,0.562500,0.985885,0.583591

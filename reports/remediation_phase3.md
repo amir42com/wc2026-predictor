@@ -56,7 +56,13 @@ evaluation out of this phase).
 
 * Training input: all 49,404 canonical pre-cutoff rows (production_mask
   excludes 0 rows — the canonical loader already ends at 2026-06-10).
-* Production settings unchanged; best_iteration 175.
+* Production settings unchanged; best_iteration 175 (old bundle: 130, read
+  from the backed-up baseline bundle — recorded for Phase 4's metric
+  attribution).
+* Article §4 rewording flagged for Phase 8 (checkpoint note): 0.75 must be
+  presented as a frozen convention that the corrected search corroborates as
+  indistinguishable from optimal (weight unidentifiable at n=128), not as a
+  discovered optimum.
 * New bundle `models/xgb_wc2026.joblib` SHA-256 `52752a62a0ac53e927e65ac37fae
   ef6bb24c68591891ebd78d8721eb6ee9eb4d`.
 * Serving artifacts: `features.py` re-run — features.csv / team_state.csv /

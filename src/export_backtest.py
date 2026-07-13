@@ -1,24 +1,24 @@
 """
-Row-level export of the leakage-free WC backtest.
+Canonical frozen-state benchmark export (remediation Phase 4).
 
-Walks the SAME walk-forward folds as src/backtest.py (WC 2014/2018/2022, each
-model trained only on matches strictly before that tournament's first match)
-and writes, for every match:
+Runs the frozen-state fold protocol (backtest.frozen_fold_run — the evaluator
+validated on the 2006/2010 tune folds, imported verbatim from
+blend_weight_search) over WC 2014/2018/2022 and writes:
 
-  * the raw XGBoost probabilities   (model.predict_proba, BEFORE blending)
-  * the production blend            (ELO_BLEND_W * XGB + (1-ELO_BLEND_W) * the
-                                     DEPLOYED Elo prior, fixed 0.227 draw share)
-  * the naive Elo-baseline          (elo_baseline_proba, fold-specific draw rate)
+  reports/backtest_predictions.csv     one row per match, all three systems
+  reports/backtest_metrics_summary.csv per-tournament + combined metrics,
+                                       plus diagnostics rows (Wilson 95% CIs,
+                                       10-bin ECE, draw-pick counts) and the
+                                       per-fold HFA-refit sensitivity rows
+                                       promised at remediation Phase 2
 
-Outputs (tracked, publishable with the article):
-  reports/backtest_predictions.csv       one row per match, all three models
-  reports/backtest_metrics_summary.csv   accuracy / log-loss / Brier, per
-                                         tournament and combined, per model
+Run src/paired_tests.py afterwards to append the McNemar + paired-bootstrap
+rows (it strips and rewrites only its own rows).
 
-No modelling code is modified — this only re-runs the existing backtest logic
-(train.train_model / make_X / ELO_BLEND_W, backtest.elo_baseline_proba /
-brier_multiclass) and records what it produces, so the numbers reconcile to
-the article exactly.
+There is deliberately NO reconciliation against previously published numbers:
+the pre-remediation baseline is preserved verbatim in
+reports/remediation_baseline.md, and the decomposition of old-vs-new lives in
+reports/evaluation_protocol_comparison.csv (src/protocol_comparison.py).
 
 Usage:
     python src/export_backtest.py
@@ -30,70 +30,35 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import accuracy_score, log_loss
 
-from train import make_X, train_model
-from backtest import (BACKTEST_YEARS, brier_multiclass, elo_baseline_proba,
-                      deployed_model_and_blend)
+import backtest as bt
+from backtest import BACKTEST_YEARS, brier_multiclass
+from features import load_canonical_results
+from train import ELO_BLEND_W, ELO_DRAW_RATE, HFA_ELO, elo_prior_proba, fit_hfa_elo
 
 PROCESSED_DIR = Path(__file__).resolve().parents[1] / "data" / "processed"
 REPORTS_DIR = Path(__file__).resolve().parents[1] / "reports"
 
-# Article headline numbers (combined, 192 matches) for reconciliation.
-# (accuracy fraction, log-loss, multiclass Brier). These reflect the DEPLOYED
-# inference: the model output is symmetry-averaged over both home/away orderings
-# before the Elo blend (so "Raw XGBoost" here is that averaged output). Earlier
-# single-orientation figures were blend 0.552/0.9809/0.5804, xgb 0.542/0.9897/
-# 0.5859; symmetry-averaging lifted accuracy and lowered log-loss/Brier.
-ARTICLE_COMBINED = {
-    "xgb":   (0.5625, 0.9762, 0.5758),
-    "blend": (0.5625, 0.9720, 0.5735),
-    "elo":   (0.5781, 0.9769, 0.5770),
-}
-RECONCILE_TOL = {"acc": 0.005, "ll": 0.0005, "brier": 0.0005}
+DIAG_TAG = "Diagnostics (192)"
+SENS_TAG = "Sensitivity (HFA per-fold refit)"
+SYSTEMS = [("xgb", "Raw XGBoost"), ("blend", "Blend"), ("elo", "Elo")]
 
 
-def _fold_predictions(df: pd.DataFrame) -> list[dict]:
-    """Run every backtest fold and collect per-match rows + pooled arrays."""
+def _fold_predictions(canonical: pd.DataFrame,
+                      features_all: pd.DataFrame) -> list[dict]:
+    """Run every benchmark fold under the canonical frozen-state protocol."""
     folds = []
     for year in BACKTEST_YEARS:
-        wc_mask = (df["is_world_cup"] == 1) & (df["date"].dt.year == year)
-        df_wc = df[wc_mask].reset_index(drop=True)
-        if df_wc.empty:
-            print(f"  WC {year}: no matches found — skipping.")
-            continue
-
-        cutoff = df_wc["date"].min()
-        df_pre = df[df["date"] < cutoff].reset_index(drop=True)
-        print(f"  WC {year}: {len(df_wc)} matches | "
-              f"training on {len(df_pre):,} matches before {cutoff.date()} ...")
-
-        model, feature_cols = train_model(df_pre)
-
-        y_wc = df_wc["outcome"].values
-
-        # Deployed inference (identical to backtest.py / the app): the model
-        # output is symmetry-averaged over both orderings, then blended with the
-        # fixed-0.227 Elo prior. "Raw XGBoost" here is that symmetry-averaged
-        # model output BEFORE the blend.
-        xgb_proba, blend_proba = deployed_model_and_blend(model, df_wc, feature_cols)
-        # Naive Elo baseline — fold-specific draw rate (no leakage), unchanged.
-        draw_rate = float((df_pre["outcome"] == 1).mean())
-        elo_proba = elo_baseline_proba(df_wc, draw_rate)
-
-        folds.append({
-            "tournament": f"WC {year}",
-            "df_wc": df_wc,
-            "y": y_wc,
-            "xgb": xgb_proba,
-            "blend": blend_proba,
-            "elo": elo_proba,
-        })
+        r = bt.frozen_fold_run(canonical, features_all, year)
+        n_host = int((r["fold_df"]["neutral"] == 0).sum())
+        print(f"    host (non-neutral) rows: {n_host} of {len(r['y'])}")
+        folds.append(r)
     return folds
 
 
 def _row_frame(folds: list[dict]) -> pd.DataFrame:
     rows = []
     for f in folds:
-        df_wc, y = f["df_wc"], f["y"]
+        df_wc, y = f["fold_df"], f["y"]
         for i in range(len(df_wc)):
             rows.append({
                 "date":       df_wc["date"].iloc[i].date().isoformat(),
@@ -123,78 +88,142 @@ def _metrics(y: np.ndarray, proba: np.ndarray) -> dict:
 
 
 def _metrics_frame(folds: list[dict]) -> pd.DataFrame:
-    model_keys = [("xgb", "Raw XGBoost"), ("blend", "Blend"), ("elo", "Elo")]
     rows = []
-
-    # Per tournament
     for f in folds:
-        for key, label in model_keys:
+        for key, label in SYSTEMS:
             m = _metrics(f["y"], f[key])
             rows.append({"tournament": f["tournament"], "model": label,
                          "n": len(f["y"]), **m})
 
-    # Combined (pool every match so per-sample metrics are exact)
     y_all = np.concatenate([f["y"] for f in folds])
-    for key, label in model_keys:
+    for key, label in SYSTEMS:
         proba_all = np.vstack([f[key] for f in folds])
         m = _metrics(y_all, proba_all)
         rows.append({"tournament": "Combined", "model": label,
                      "n": len(y_all), **m})
-
     return pd.DataFrame(rows)
 
 
-def _reconcile(metrics: pd.DataFrame) -> None:
-    print("\nReconciliation against article headline numbers (combined, 192):")
-    key_to_label = {"xgb": "Raw XGBoost", "blend": "Blend", "elo": "Elo"}
-    comb = metrics[metrics["tournament"] == "Combined"].set_index("model")
-    any_off = False
-    for key, (a_acc, a_ll, a_br) in ARTICLE_COMBINED.items():
-        row = comb.loc[key_to_label[key]]
-        d_acc = abs(row["accuracy"] - a_acc)
-        d_ll = abs(row["log_loss"] - a_ll)
-        d_br = abs(row["brier"] - a_br)
-        off = (d_acc > RECONCILE_TOL["acc"] or d_ll > RECONCILE_TOL["ll"]
-               or d_br > RECONCILE_TOL["brier"])
-        flag = "  <-- DIFFERS" if off else "ok"
-        any_off = any_off or off
-        print(f"  {key_to_label[key]:<12} "
-              f"acc {row['accuracy']*100:5.1f}% (article {a_acc*100:.1f}%, d {d_acc*100:+.2f}pp)  "
-              f"ll {row['log_loss']:.4f} (art {a_ll:.4f}, d {d_ll:+.4f})  "
-              f"brier {row['brier']:.4f} (art {a_br:.4f}, d {d_br:+.4f})  [{flag}]")
-    if any_off:
-        print("  WARNING: at least one metric differs by more than rounding.")
-    else:
-        print("  All three models reconcile to the article within rounding.")
+def _wilson(k: int, n: int, z: float = 1.96) -> tuple[float, float]:
+    p = k / n
+    denom = 1 + z * z / n
+    center = (p + z * z / (2 * n)) / denom
+    half = z * np.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / denom
+    return center - half, center + half
+
+
+def _ece(y: np.ndarray, proba: np.ndarray, n_bins: int = 10) -> float:
+    """Expected calibration error: 10 equal-width bins on top-class confidence."""
+    conf = proba.max(axis=1)
+    pred = proba.argmax(axis=1)
+    correct = (pred == y).astype(float)
+    edges = np.linspace(0.0, 1.0, n_bins + 1)
+    ece = 0.0
+    for i in range(n_bins):
+        m = (conf > edges[i]) & (conf <= edges[i + 1]) if i else (conf <= edges[1])
+        if m.sum():
+            ece += (m.sum() / len(y)) * abs(correct[m].mean() - conf[m].mean())
+    return float(ece)
+
+
+def _diagnostics_rows(folds: list[dict]) -> list[dict]:
+    y_all = np.concatenate([f["y"] for f in folds])
+    n = len(y_all)
+    n_draws = int((y_all == 1).sum())
+    rows = []
+    for key, label in SYSTEMS:
+        proba = np.vstack([f[key] for f in folds])
+        pred = proba.argmax(axis=1)
+        k = int((pred == y_all).sum())
+        lo, hi = _wilson(k, n)
+        rows.append({"tournament": DIAG_TAG, "model": label, "n": n,
+                     "statistic": "acc_wilson95", "value": k / n,
+                     "detail": f"95% CI [{lo:.4f}, {hi:.4f}], {k} correct of {n}"})
+        rows.append({"tournament": DIAG_TAG, "model": label, "n": n,
+                     "statistic": "ece_10bin", "value": _ece(y_all, proba),
+                     "detail": "10 equal-width bins on top-class confidence"})
+        rows.append({"tournament": DIAG_TAG, "model": label, "n": n,
+                     "statistic": "draw_picks", "value": int((pred == 1).sum()),
+                     "detail": f"hard draw picks of {n}; actual draws {n_draws}"})
+    return rows
+
+
+def _hfa_refit_rows(folds: list[dict], features_all: pd.DataFrame) -> list[dict]:
+    """
+    The per-fold HFA refit sensitivity promised at Phase 2: refit the offset
+    on each fold's own training window (production link, canonical data), then
+    rescore Blend and Elo with the refit value on that fold's host rows. Only
+    the prior/baseline shift — the model output is HFA-independent.
+    """
+    refit = {}
+    blend_parts, elo_parts, y_parts = [], [], []
+    for f in folds:
+        cutoff = f["fold_df"]["date"].min()
+        h = fit_hfa_elo(features_all[features_all["date"] < cutoff])
+        refit[f["year"]] = h
+
+        fd = f["fold_df"]
+        prior = np.vstack([
+            elo_prior_proba(
+                he + (0.0 if nu else h), ae, ELO_DRAW_RATE)
+            for he, ae, nu in zip(fd["frozen_home_elo"], fd["frozen_away_elo"],
+                                  fd["neutral"])])
+        b = ELO_BLEND_W * f["xgb"] + (1 - ELO_BLEND_W) * prior
+        blend_parts.append(b / b.sum(axis=1, keepdims=True))
+
+        base_frame = pd.DataFrame({"home_elo": fd["frozen_home_elo"].values,
+                                   "away_elo": fd["frozen_away_elo"].values,
+                                   "neutral": fd["neutral"].values})
+        elo_parts.append(bt.elo_baseline_proba(base_frame, f["draw_rate"],
+                                               hfa_elo=h))
+        y_parts.append(f["y"])
+
+    y_all = np.concatenate(y_parts)
+    detail = ("refit per fold (production link, pre-fold canonical data): "
+              + ", ".join(f"{yr}={h:.1f}" for yr, h in refit.items())
+              + f"; production constant {HFA_ELO}")
+    rows = []
+    for label, proba in [("Blend", np.vstack(blend_parts)),
+                         ("Elo", np.vstack(elo_parts))]:
+        m = _metrics(y_all, proba)
+        rows.append({"tournament": SENS_TAG, "model": label, "n": len(y_all),
+                     **m, "statistic": "hfa_refit", "value": np.nan,
+                     "detail": detail})
+    return rows
 
 
 def main() -> None:
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
-    print("Loading features.csv ...")
-    df = pd.read_csv(PROCESSED_DIR / "features.csv", parse_dates=["date"])
-    print(f"  {len(df):,} rows total\n")
+    print("Loading canonical data + features.csv ...")
+    canonical = load_canonical_results()
+    features_all = pd.read_csv(PROCESSED_DIR / "features.csv",
+                               parse_dates=["date"])
+    print(f"  {len(features_all):,} feature rows\n")
 
-    folds = _fold_predictions(df)
+    folds = _fold_predictions(canonical, features_all)
 
     rows = _row_frame(folds)
     rows_path = REPORTS_DIR / "backtest_predictions.csv"
     rows.to_csv(rows_path, index=False)
 
     metrics = _metrics_frame(folds)
+    extra = pd.DataFrame(_diagnostics_rows(folds)
+                         + _hfa_refit_rows(folds, features_all))
+    summary = pd.concat([metrics, extra], ignore_index=True)
     metrics_path = REPORTS_DIR / "backtest_metrics_summary.csv"
-    metrics.to_csv(metrics_path, index=False, float_format="%.6f")
+    summary.to_csv(metrics_path, index=False, float_format="%.6f")
 
     print(f"\nWrote {len(rows)} match rows -> {rows_path}")
     print(f"Wrote metrics summary -> {metrics_path}")
 
-    print("\nCombined metrics (192 matches):")
+    print("\nCombined metrics (192 matches, frozen-state protocol):")
     comb = metrics[metrics["tournament"] == "Combined"]
     for _, r in comb.iterrows():
         print(f"  {r['model']:<12} accuracy {r['accuracy']*100:5.1f}%   "
               f"log-loss {r['log_loss']:.4f}   Brier {r['brier']:.4f}")
-
-    _reconcile(metrics)
+    print("\n(old-vs-new decomposition: reports/evaluation_protocol_comparison.csv;"
+          "\n pre-remediation baseline: reports/remediation_baseline.md)")
 
 
 if __name__ == "__main__":

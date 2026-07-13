@@ -95,7 +95,16 @@ def _h2h_stats(h2h: dict, home: str, away: str) -> tuple[int, float]:
 
 def fold_frozen_predictions(canonical: pd.DataFrame, features_all: pd.DataFrame,
                             year: int):
-    """Frozen-state fold evaluation: returns (y, p_model, prior, n_host)."""
+    """
+    Frozen-state fold evaluation (THE canonical fold protocol — the Phase 4
+    benchmark imports and runs this very function).
+
+    Returns (fold_df, y, p_model, prior): fold_df is the fold's canonical
+    match rows plus `frozen_home_elo`/`frozen_away_elo` (the pre-tournament
+    snapshot ratings every prediction uses — needed by the Elo baseline so it
+    runs on the SAME frozen state), y the outcomes, p_model the venue-aware
+    model output before the blend, prior the production Elo-logistic prior.
+    """
     fold = canonical[(canonical["tournament"] == "FIFA World Cup")
                      & (canonical["date"].dt.year == year)].reset_index(drop=True)
     if fold.empty:
@@ -128,13 +137,15 @@ def fold_frozen_predictions(canonical: pd.DataFrame, features_all: pd.DataFrame,
         X, _ = make_X(pd.DataFrame([row]), feature_cols)
         return X
 
-    y, p_model, prior, n_host = [], [], [], 0
+    y, p_model, prior = [], [], []
+    frozen_h_elo, frozen_a_elo = [], []
     for _, m in fold.iterrows():
         home, away = m["home_team"], m["away_team"]
         neutral = bool(m["neutral"])
-        n_host += (not neutral)
         ctx = MatchContext(home, away, neutral=neutral)
         elo_h, elo_a = state[home]["elo"], state[away]["elo"]
+        frozen_h_elo.append(elo_h)
+        frozen_a_elo.append(elo_a)
 
         # Model output before the blend (venue contract applied inside).
         p_model.append(predict_match_proba(model, build_x, ctx, elo_h, elo_a,
@@ -146,8 +157,9 @@ def fold_frozen_predictions(canonical: pd.DataFrame, features_all: pd.DataFrame,
         hs_, as_ = float(m["home_score"]), float(m["away_score"])
         y.append(0 if hs_ > as_ else (1 if hs_ == as_ else 2))
 
-    return (np.array(y), np.vstack(p_model), np.vstack(prior),
-            n_host, len(fold))
+    fold = fold.assign(frozen_home_elo=frozen_h_elo,
+                       frozen_away_elo=frozen_a_elo)
+    return fold, np.array(y), np.vstack(p_model), np.vstack(prior)
 
 
 def brier(y: np.ndarray, proba: np.ndarray) -> float:
@@ -168,8 +180,10 @@ def main() -> None:
     folds = {}
     for year in TUNE_YEARS:
         assert year < 2014, "benchmark folds (2014/2018/2022) are Phase 4 holdout"
-        folds[year] = fold_frozen_predictions(canonical, features_all, year)
-        print(f"    host (non-neutral) rows: {folds[year][3]} of {folds[year][4]}")
+        fold_df, yy, pm, pr = fold_frozen_predictions(canonical, features_all, year)
+        folds[year] = (yy, pm, pr)
+        n_host = int((fold_df["neutral"] == 0).sum())
+        print(f"    host (non-neutral) rows: {n_host} of {len(fold_df)}")
 
     y_all = np.concatenate([folds[y][0] for y in TUNE_YEARS])
     pm_all = np.vstack([folds[y][1] for y in TUNE_YEARS])
@@ -179,7 +193,7 @@ def main() -> None:
     for w in WEIGHTS:
         rec = {"w": w}
         for year in TUNE_YEARS:
-            yy, pm, pr = folds[year][0], folds[year][1], folds[year][2]
+            yy, pm, pr = folds[year]
             b = _blend(w, pm, pr)
             rec[f"ll_{year}"] = log_loss(yy, b, labels=[0, 1, 2])
             rec[f"acc_{year}"] = accuracy_score(yy, b.argmax(axis=1))

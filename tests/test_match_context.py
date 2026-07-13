@@ -99,18 +99,28 @@ def test_hfa_fit_reproduces_frozen_constant():
     assert abs(train.fit_hfa_elo(df) - train.HFA_ELO) < 0.05
 
 
-def test_protocol_gate_blocks_backtest_numbers():
+def test_protocol_gate_mechanism():
+    """Phase 4 lifted the gate (frozen evaluator is the default path), so the
+    flag must now be True — and the gate machinery must still block every
+    inference entry point whenever the flag is lowered."""
+    assert bt.PROTOCOL_COMPLETE is True
+
     df = pd.DataFrame({"home_elo": [1600.0], "away_elo": [1500.0], "neutral": [1]})
-    for fn in (lambda: bt.elo_baseline_proba(df, 0.25),
-               lambda: bt.production_blend_prior(df),
-               lambda: bt.deployed_model_and_blend(MODEL, df, []),
-               lambda: bt.backtest(df)):
-        try:
-            fn()
-        except RuntimeError as exc:
-            assert "PROTOCOL-INCOMPLETE" in str(exc)
-        else:
-            raise AssertionError("gated backtest entry point ran without Phase 4")
+    bt.PROTOCOL_COMPLETE = False
+    try:
+        for fn in (lambda: bt.elo_baseline_proba(df, 0.25),
+                   lambda: bt.production_blend_prior(df),
+                   lambda: bt.deployed_model_and_blend(MODEL, df, []),
+                   lambda: bt.backtest(df, df),
+                   lambda: bt.frozen_fold_run(df, df, 2014)):
+            try:
+                fn()
+            except RuntimeError as exc:
+                assert "PROTOCOL-INCOMPLETE" in str(exc)
+            else:
+                raise AssertionError("gated entry point ran with the gate down")
+    finally:
+        bt.PROTOCOL_COMPLETE = True
 
 
 def test_baseline_venue_parity():

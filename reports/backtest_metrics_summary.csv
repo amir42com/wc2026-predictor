@@ -1,15 +1,26 @@
 tournament,model,n,accuracy,log_loss,brier,statistic,value,detail
-WC 2014,Raw XGBoost,64,0.609375,0.918165,0.541073,,,
-WC 2014,Blend,64,0.609375,0.920663,0.542548,,,
-WC 2014,Elo,64,0.609375,0.938830,0.555480,,,
-WC 2018,Raw XGBoost,64,0.546875,0.962694,0.569676,,,
-WC 2018,Blend,64,0.546875,0.954941,0.565921,,,
-WC 2018,Elo,64,0.578125,0.950053,0.564498,,,
-WC 2022,Raw XGBoost,64,0.531250,1.047861,0.616569,,,
-WC 2022,Blend,64,0.531250,1.040508,0.612005,,,
-WC 2022,Elo,64,0.546875,1.041799,0.611098,,,
-Combined,Raw XGBoost,192,0.562500,0.976240,0.575773,,,
-Combined,Blend,192,0.562500,0.972037,0.573491,,,
-Combined,Elo,192,0.578125,0.976894,0.577025,,,
-Paired test (192),McNemar exact (Blend vs Elo),192,,,,p_value,0.581055,"b=5 (blend-only correct), c=8 (elo-only correct), discordant=13"
-Paired test (192),Bootstrap logloss diff (Blend-Elo),192,,,,mean_diff,-0.004857,"95% CI [-0.0259, 0.0175], 10000 resamples, seed 12345"
+WC 2014,Raw XGBoost,64,0.562500,0.957177,0.569527,,,
+WC 2014,Blend,64,0.562500,0.955870,0.568801,,,
+WC 2014,Elo,64,0.593750,0.965147,0.574982,,,
+WC 2018,Raw XGBoost,64,0.531250,0.967354,0.570738,,,
+WC 2018,Blend,64,0.531250,0.957541,0.565633,,,
+WC 2018,Elo,64,0.562500,0.950957,0.562500,,,
+WC 2022,Raw XGBoost,64,0.515625,1.033955,0.612068,,,
+WC 2022,Blend,64,0.500000,1.032044,0.610216,,,
+WC 2022,Elo,64,0.531250,1.041552,0.613291,,,
+Combined,Raw XGBoost,192,0.536458,0.986162,0.584111,,,
+Combined,Blend,192,0.531250,0.981818,0.581550,,,
+Combined,Elo,192,0.562500,0.985885,0.583591,,,
+Diagnostics (192),Raw XGBoost,192,,,,acc_wilson95,0.536458,"95% CI [0.4659, 0.6056], 103 correct of 192"
+Diagnostics (192),Raw XGBoost,192,,,,ece_10bin,0.047015,10 equal-width bins on top-class confidence
+Diagnostics (192),Raw XGBoost,192,,,,draw_picks,1.000000,hard draw picks of 192; actual draws 41
+Diagnostics (192),Blend,192,,,,acc_wilson95,0.531250,"95% CI [0.4607, 0.6005], 102 correct of 192"
+Diagnostics (192),Blend,192,,,,ece_10bin,0.040028,10 equal-width bins on top-class confidence
+Diagnostics (192),Blend,192,,,,draw_picks,0.000000,hard draw picks of 192; actual draws 41
+Diagnostics (192),Elo,192,,,,acc_wilson95,0.562500,"95% CI [0.4918, 0.6308], 108 correct of 192"
+Diagnostics (192),Elo,192,,,,ece_10bin,0.054073,10 equal-width bins on top-class confidence
+Diagnostics (192),Elo,192,,,,draw_picks,0.000000,hard draw picks of 192; actual draws 41
+Sensitivity (HFA per-fold refit),Blend,192,0.531250,0.981890,0.581592,hfa_refit,,"refit per fold (production link, pre-fold canonical data): 2014=130.2, 2018=128.6, 2022=127.8; production constant 125.58"
+Sensitivity (HFA per-fold refit),Elo,192,0.557292,0.986177,0.583757,hfa_refit,,"refit per fold (production link, pre-fold canonical data): 2014=130.2, 2018=128.6, 2022=127.8; production constant 125.58"
+Paired test (192),McNemar exact (Blend vs Elo),192,,,,p_value,0.210114,"b=5 (blend-only correct), c=11 (elo-only correct), discordant=16"
+Paired test (192),Bootstrap logloss diff (Blend-Elo),192,,,,mean_diff,-0.004067,"95% CI [-0.0252, 0.0181], 10000 resamples, seed 12345"
