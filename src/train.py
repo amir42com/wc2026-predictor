@@ -69,14 +69,17 @@ LABEL_MAP = {0: "Home win", 1: "Draw", 2: "Away win"}
 WC_BACKTEST_YEARS = [2014, 2018, 2022]
 
 # Production ensemble: blend XGB probabilities with an Elo-logistic prior.
-# Honest finding from the canonical 192-match backtest (see
-# reports/backtest_metrics_summary.csv): the blend IMPROVES on raw XGB
-# (log-loss/Brier) and posts numerically lower pooled log-loss (0.9720 vs
-# 0.9769) and Brier (0.5735 vs 0.5770) than the naive Elo baseline, but Elo
-# is more accurate (57.8% vs 56.25%) and the gap is within noise (McNemar
-# p≈0.58, bootstrap log-loss CI straddles 0). The blend ships for its better
-# probabilistic scores over raw XGB, not as a claimed win over Elo. Weight
-# tuned on WC 2006/2010 only.
+# Honest finding from the pre-remediation 192-match backtest (baseline values
+# preserved in reports/remediation_baseline.md; Phase 4 re-derives them under
+# the corrected protocol): the blend improved on raw XGB (log-loss/Brier) and
+# posted numerically lower pooled log-loss than the naive Elo baseline, but
+# Elo was more accurate and the gap was within noise. The blend ships for its
+# better probabilistic scores over raw XGB, not as a claimed win over Elo.
+# Weight tuned on WC 2006/2010 only. Remediation Phase 3 re-ran that selection
+# under the corrected frozen-state protocol (reports/blend_weight_search.csv):
+# tune-fold argmin was w=1.00, but the whole curve spans less than one
+# bootstrap SE of the minimum (delta at 0.75: 0.0048 vs SE 0.0425), so the
+# pre-registered rule keeps 0.75 — corroborated, not re-tuned.
 ELO_BLEND_W   = 0.75   # XGB share of the blend
 ELO_DRAW_RATE = 0.227  # historical draw share used by the prior
 
@@ -383,10 +386,60 @@ def _print_backtest_table(df: pd.DataFrame) -> None:
     print(sep)
 
 
+def write_manifest(bundle_path: Path, model, feature_cols: list[str],
+                   n_train_rows: int) -> Path:
+    """
+    Provenance manifest for the shipped bundle (remediation Phase 3 closes the
+    audit's "no provenance manifest" gap): hashes of the bundle and its exact
+    training input, plus every frozen production constant the deployed
+    inference uses. models/ is gitignored; the manifest is force-tracked.
+    """
+    import hashlib
+    import json
+    import subprocess
+    from datetime import datetime, timezone
+
+    import xgboost
+
+    def _sha256(p: Path) -> str:
+        return hashlib.sha256(p.read_bytes()).hexdigest()
+
+    try:
+        git_sha = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=bundle_path.parents[1],
+            capture_output=True, text=True).stdout.strip() or None
+    except Exception:
+        git_sha = None
+
+    manifest = {
+        "created_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "code_git_sha": git_sha,
+        "bundle_file": bundle_path.name,
+        "bundle_sha256": _sha256(bundle_path),
+        "training_rows": n_train_rows,
+        "features_csv_sha256": _sha256(PROCESSED_DIR / "features.csv"),
+        "raw_results_sha256": _sha256(
+            PROCESSED_DIR.parent / "raw" / "results.csv"),
+        "elo_blend_w": ELO_BLEND_W,
+        "elo_draw_rate": ELO_DRAW_RATE,
+        "hfa_elo": HFA_ELO,
+        "best_iteration": int(model.best_iteration),
+        "n_features": len(feature_cols),
+        "xgboost_version": xgboost.__version__,
+        "blend_weight_search": "reports/blend_weight_search.csv",
+    }
+    out = bundle_path.parent / "model-manifest.json"
+    out.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    return out
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--backtest", action="store_true",
                         help="Run WC walk-forward backtest (trains 4 extra models, ~2 min)")
+    parser.add_argument("--production-only", action="store_true",
+                        help="Train and save ONLY the shipped bundle (skips the "
+                             "pre-2018 eval model and its 2018+ read-out)")
     args = parser.parse_args()
 
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
@@ -395,17 +448,18 @@ def main() -> None:
     df = pd.read_csv(PROCESSED_DIR / "features.csv", parse_dates=["date"])
     print(f"  {len(df):,} rows total")
 
-    mask = df["date"].dt.year < TEST_YEAR
-    df_train, df_test = df[mask].reset_index(drop=True), df[~mask].reset_index(drop=True)
-    print(f"  Train: {len(df_train):,} matches (before {TEST_YEAR})")
-    print(f"  Test:  {len(df_test):,} matches  ({TEST_YEAR}+)\n")
+    if not args.production_only:
+        mask = df["date"].dt.year < TEST_YEAR
+        df_train, df_test = df[mask].reset_index(drop=True), df[~mask].reset_index(drop=True)
+        print(f"  Train: {len(df_train):,} matches (before {TEST_YEAR})")
+        print(f"  Test:  {len(df_test):,} matches  ({TEST_YEAR}+)\n")
 
-    print("Training evaluation model (pre-2018 only) ...")
-    eval_model, feature_cols = train_model(df_train)
-    print(f"  {len(feature_cols)} input features\n")
+        print("Training evaluation model (pre-2018 only) ...")
+        eval_model, feature_cols = train_model(df_train)
+        print(f"  {len(feature_cols)} input features\n")
 
-    print(f"Evaluation on held-out test set ({TEST_YEAR}+):")
-    evaluate(eval_model, df_test, feature_cols)
+        print(f"Evaluation on held-out test set ({TEST_YEAR}+):")
+        evaluate(eval_model, df_test, feature_cols)
 
     # Shipped model: retrain on ALL pre-tournament data so the deployed
     # predictor has seen 2018–2026, not just the pre-2018 eval slice.
@@ -421,6 +475,9 @@ def main() -> None:
 
     size_mb = out.stat().st_size / 1e6
     print(f"\nModel saved -> {out}  ({size_mb:.1f} MB)")
+
+    manifest_path = write_manifest(out, model, feature_cols, len(df_prod))
+    print(f"Manifest    -> {manifest_path}")
 
     print("\nTop 15 features by importance (shipped model):")
     imp = pd.Series(model.feature_importances_, index=feature_cols).nlargest(15)
