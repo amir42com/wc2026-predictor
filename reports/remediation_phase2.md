@@ -50,6 +50,39 @@ chronological halves): 132.1 / 117.9 — home advantage declines over time,
 consistent with the literature; Phase 4 reports per-fold refits as the
 formal sensitivity line.
 
+### HFA sensitivity study (post-checkpoint review, 2026-07-13)
+
+The frozen 125.58 sits above the 60–100 Elo club-football literature band, so
+a read-only sensitivity study was run before Phase 3 (no backtest numbers; the
+protocol gate stayed down). Production link = the shipped draws-dropped MLE;
+`decided` = win/loss rows entering that fit.
+
+| Window | All matches | Competitive only | Friendlies only |
+| --- | --- | --- | --- |
+| Full history | **125.58** (n=28,038) | 137.96 (n=16,243) | 110.39 (n=11,795) |
+| >=1990 | 123.82 (n=17,736) | **128.32** (n=11,410) | 116.38 (n=6,326) |
+| >=2000 | 119.15 (n=13,921) | 122.59 (n=9,120) | 113.11 (n=4,801) |
+| >=2010 | 111.18 (n=8,516) | 113.33 (n=5,736) | 106.99 (n=2,780) |
+
+Draw-inclusive check (Davidson link, joint MLE of h and draw parameter ν),
+post-1990: h = 126.52 (all, ν = 0.754), h = 131.51 (competitive, ν = 0.681) —
+within ~3 Elo of the production-link fits on the same windows, so the
+draws-dropped choice does not bias the magnitude.
+
+**Decision (approved):** keep HFA_ELO = 125.58. The pre-registered decision
+rule — a post-1990 competitive fit near 126 confirms the full-history number —
+was met (128.32). Every window/type/link lands in 107–138: international HFA
+in this dataset structurally exceeds the club-football band (travel, altitude,
+qualifier atmospheres; friendlies run 10–20 Elo below competitive in every
+era). The deployment-domain alternative (post-2010 competitive, 113.33) was
+considered and rejected: it would move blended probabilities by ~0.35pp
+(1.4pp on the prior at even Elo × the 0.25 prior weight) — a documentation
+question, not a results question. HFA declines monotonically across eras
+(competitive 138 → 113), which is the context for reading Phase 4's per-fold
+refit sensitivity line. Dataset scope is unchanged — full history stays (Elo
+needs the recursive runway; K=40 provides recency discounting); era-weighted
+training is a documented v3 experiment, not a remediation decision.
+
 ## Population per consumer (staging)
 
 | Consumer | Status this phase |
