@@ -23,9 +23,9 @@ from sklearn.metrics import accuracy_score, log_loss
 
 from train import NUMERIC_COLS, make_X, train_model
 from backtest import brier_multiclass, elo_baseline_proba
+from features import load_canonical_results
 
 PROCESSED_DIR = Path(__file__).resolve().parents[1] / "data" / "processed"
-RAW_DIR       = Path(__file__).resolve().parents[1] / "data" / "raw"
 CACHE_DIR     = PROCESSED_DIR / "exp_cache"
 
 TUNE_YEARS = [2006, 2010]   # for ensemble-weight tuning only (pre-2014)
@@ -44,13 +44,17 @@ EXTRA_COLS = [
 
 def load_df() -> pd.DataFrame:
     df = pd.read_csv(PROCESSED_DIR / "features.csv", parse_dates=["date"])
-    raw = pd.read_csv(RAW_DIR / "results.csv", parse_dates=["date"])
-    raw = raw.dropna(subset=["home_score", "away_score"])
-    raw = raw.drop_duplicates(subset=["date", "home_team", "away_team"])
-    df = df.merge(
-        raw[["date", "home_team", "away_team", "home_score", "away_score"]],
-        on=["date", "home_team", "away_team"], how="left",
-    )
+    # Scores come from the ONE canonical load path (features.py owns the
+    # duplicate policy). The kept 1974 Tahiti double-header makes the
+    # (date, home, away) key non-unique, so align same-key rows by their
+    # per-key rank in canonical sort order instead of dropping one.
+    raw = load_canonical_results()
+    key = ["date", "home_team", "away_team"]
+    raw = raw.assign(_k=raw.groupby(key).cumcount())
+    df = df.assign(_k=df.groupby(key).cumcount()).merge(
+        raw[key + ["_k", "home_score", "away_score"]],
+        on=key + ["_k"], how="left",
+    ).drop(columns="_k")
     return df
 
 
