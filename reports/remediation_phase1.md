@@ -57,7 +57,8 @@ on the data.
   published pipeline honoured it only by accident: post-cutoff fixtures had NA
   scores at fetch time and fell to `dropna`; the re-fetched raw file has 40 of
   those scores filled in, so a naive rebuild would have leaked in-tournament
-  results into `features.csv`.
+  results into `features.csv`. This change converts an accidental exclusion
+  of WC 2026 results into a structural one (accepted at Checkpoint 1B).
 * `experiments.py` now sources scores through the canonical loader (cumcount
   alignment on the non-unique key), eliminating its divergent dedupe.
 
