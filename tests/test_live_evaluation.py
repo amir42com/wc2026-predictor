@@ -105,6 +105,54 @@ def test_join_flags_team_mismatch():
     assert rows == [] and len(problems) == 1 and "do not match" in problems[0]
 
 
+# ── fixture-ID mapping (post-push review fix) ───────────────────────────────
+
+def test_fixture_slug_maps_all_registry_dates():
+    """Every ledger-registry fixture maps to its official M-number by kickoff
+    date — M101/M102 included (the reviewed bug mapped only M103/M104)."""
+    for date, fid in [("2026-07-14", "M101"), ("2026-07-15", "M102"),
+                      ("2026-07-18", "M103"), ("2026-07-19", "M104")]:
+        m = {"date": date, "home_team": "X", "away_team": "Y"}
+        assert le.fixture_slug(m) == f"WC2026-{fid}", (date, fid)
+    # Non-registry dates keep the retrospective date-teams slug.
+    m = {"date": "2026-06-15", "home_team": "X", "away_team": "Y"}
+    assert le.fixture_slug(m) == "WC2026-2026-06-15-X-v-Y"
+
+
+def test_semifinal_results_join_ledger_entries_as_prospective():
+    """Both finished semifinals must join their prospective ledger entries by
+    ID — including M102, where the ledger stores Argentina/England but the
+    result arrives as England/Argentina (reversed orientation)."""
+    ledger = [
+        _pred("WC2026-M101", a="France", b="Spain",
+              blend=(0.4, 0.3, 0.3), elo=(0.35, 0.25, 0.40)),
+        _pred("WC2026-M102", a="Argentina", b="England",
+              blend=(0.5, 0.3, 0.2), elo=(0.45, 0.25, 0.30)),
+    ]
+    cache_records = [
+        {"date": "2026-07-14", "home_team": "France", "away_team": "Spain",
+         "home_score": 0, "away_score": 1, "duration": "REGULAR"},
+        {"date": "2026-07-15", "home_team": "England", "away_team": "Argentina",
+         "home_score": 1, "away_score": 2, "duration": "EXTRA_TIME"},
+    ]
+    results = [{"fixture_id": le.fixture_slug(m), **m} for m in cache_records]
+    assert [r["fixture_id"] for r in results] == ["WC2026-M101", "WC2026-M102"]
+
+    valid, problems = le.validate_results(results)
+    assert not problems and set(valid) == {"WC2026-M101", "WC2026-M102"}
+
+    rows, join_problems = le.join_predictions(ledger, valid)
+    assert not join_problems, join_problems
+    assert len(rows) == 2, "a semifinal failed to join its ledger entry"
+    assert all(r["tier"] == "prospective" for r in rows)
+    by_id = {r["fixture_id"]: r for r in rows}
+    assert by_id["WC2026-M101"]["y"] == 2      # Spain (team_b) won
+    assert by_id["WC2026-M102"]["y"] == 0      # Argentina (team_a) won, reversed result
+
+    m = le.evaluate(rows)
+    assert m["n"] == 2 and m["n_prospective"] == 2 and m["n_retrospective"] == 0
+
+
 # ── final mode ──────────────────────────────────────────────────────────────
 
 def test_final_mode_requires_exactly_104():
