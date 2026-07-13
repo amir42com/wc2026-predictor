@@ -82,16 +82,21 @@ ELO_DRAW_RATE = 0.227  # historical draw share used by the prior
 
 # Venue contract (remediation Phase 2): the pipeline's Elo is venue-blind, so
 # when a match is NOT neutral the Elo-logistic prior receives a fixed
-# home-advantage offset. Fitted ONCE by maximum likelihood on the canonical
-# pre-cutoff training data (fit_hfa_elo below: non-neutral matches only; the
-# prior's draw share is outcome-independent of the offset, so draws are
-# uninformative and the fit reduces to home-win vs away-win). The value is a
-# frozen production constant with recorded provenance — like ELO_DRAW_RATE, it
-# is NOT tuned against any published metric, and the Phase 4 backtest must
-# report per-fold refits as a sensitivity line, mirroring the draw-rate
-# treatment. Fitted 2026-07-13 on canonical features.csv (hashes in
-# reports/remediation_phase1.md); tests/test_match_context.py re-runs the fit.
-HFA_ELO = 125.58  # MLE on 36,346 non-neutral canonical rows (28,038 decided)
+# home-advantage offset. Fitted ONCE (2026-07-13) by maximum likelihood under
+# the production link on the FULL non-neutral canonical pre-cutoff history
+# (fit_hfa_elo below: 36,346 rows; the prior's fixed draw share makes draws
+# uninformative for the offset, so 28,038 decided matches enter). A sensitivity
+# study (table in reports/remediation_phase2.md) put every era window
+# (full/>=1990/>=2000/>=2010), match type (all/competitive/friendly) and a
+# draw-inclusive Davidson link in the 107-138 range; the decision-rule window
+# (post-1990 competitive, 128.32) corroborates the full-history fit, and the
+# rejected deployment-domain alternative — post-2010 competitive, 113.33 —
+# would move blended probabilities by only ~0.35pp. HFA declines monotonically
+# across eras (competitive: 138 -> 113), so read Phase 4's mandatory per-fold
+# refit sensitivity line in that context. Like ELO_DRAW_RATE this is a frozen
+# production constant with recorded provenance, NOT tuned against any
+# published metric; tests/test_match_context.py re-runs the fit recipe.
+HFA_ELO = 125.58  # full-history MLE, production link (canonical features.csv)
 
 
 @dataclass(frozen=True)
