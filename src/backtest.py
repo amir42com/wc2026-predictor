@@ -31,13 +31,15 @@ PROCESSED_DIR = Path(__file__).resolve().parents[1] / "data" / "processed"
 BACKTEST_YEARS = [2014, 2018, 2022]
 
 # ── Protocol gate (remediation) ─────────────────────────────────────────────
-# Phase 2 landed the venue contract in this module (host rows get real home
-# advantage; the Elo baseline gets the same HFA information). The frozen-state
-# backtest protocol does not land until Phase 4, so ANY number produced by the
-# fold machinery below would mix protocols and must not look quotable — not in
-# a terminal, not in a CSV. Phase 4 flips this flag when the full protocol is
-# in place; until then every inference entry point refuses to run.
-PROTOCOL_COMPLETE = False
+# Phase 2 landed the venue contract in this module and closed this gate; Phase
+# 4 lifted it at the moment the FROZEN-STATE evaluator (one pre-tournament
+# team-state/H2H snapshot per fold, no within-tournament updates — the exact
+# protocol validated on the 2006/2010 tune folds in blend_weight_search.py)
+# became the path that runs by default. The ROLLING evaluation (recorded
+# feature rows, whose state updates during the tournament) survives below only
+# as an explicitly labelled sensitivity variant for the protocol-comparison
+# artifact; it is never the default and its numbers are never headline.
+PROTOCOL_COMPLETE = True
 
 
 def _require_complete_protocol() -> None:
@@ -73,16 +75,22 @@ def _swap_orientation(d: dict) -> dict:
     return s
 
 
-def deployed_model_and_blend(model, df_wc: pd.DataFrame,
-                             feature_cols: list) -> tuple[np.ndarray, np.ndarray]:
+def deployed_model_and_blend(model, df_wc: pd.DataFrame, feature_cols: list,
+                             venue_aware: bool = True
+                             ) -> tuple[np.ndarray, np.ndarray]:
     """
-    Run the EXACT deployed inference (train.predict_match_proba) on each
-    recorded WC match, under the venue contract: each row's MatchContext comes
-    from its recorded neutral flag, so host matches (15 of the 192: Brazil
-    2014, Russia 2018, Qatar 2022) run single-orientation with the HFA-shifted
-    prior, and neutral matches symmetry-average exactly as deployed. Returns
-    (model_avg, blend) — model_avg is the model output BEFORE the blend
-    (blend_weight=1.0).
+    ROLLING sensitivity variant — NOT the canonical benchmark. Evaluates on
+    the RECORDED feature rows, whose state updates match-by-match during the
+    tournament; it exists only so reports/evaluation_protocol_comparison.csv
+    can isolate the state-protocol delta. The canonical path is
+    frozen_fold_run below.
+
+    venue_aware=True: per-row MatchContext from the recorded neutral flag
+    (host rows single-orientation + HFA prior). venue_aware=False reproduces
+    the PRE-REMEDIATION inference exactly: every match symmetry-averaged, the
+    recorded neutral flag left untouched in the features, symmetric prior.
+    Returns (model_avg, blend) — model_avg is the model output BEFORE the
+    blend (blend_weight=1.0).
     """
     _require_complete_protocol()
     model_avg, blend = [], []
@@ -90,12 +98,13 @@ def deployed_model_and_blend(model, df_wc: pd.DataFrame,
         row = df_wc.iloc[i].to_dict()
         rev = _swap_orientation(row)
         home0 = row["home_team"]
-        ctx = MatchContext(row["home_team"], row["away_team"],
-                           neutral=bool(row["neutral"]))
+        neutral = bool(row["neutral"]) if venue_aware else True
+        ctx = MatchContext(row["home_team"], row["away_team"], neutral=neutral)
 
-        def build_x(home, away, neutral, _row=row, _rev=rev, _home0=home0):
+        def build_x(home, away, neutral_flag, _row=row, _rev=rev, _home0=home0):
             d = dict(_row if home == _home0 else _rev)
-            d["neutral"] = int(neutral)   # context governs the flag the model sees
+            if venue_aware:
+                d["neutral"] = int(neutral_flag)  # context governs the model's flag
             X, _ = make_X(pd.DataFrame([d]), feature_cols)
             return X
 
@@ -163,44 +172,51 @@ def evaluate_proba(y_true: np.ndarray, proba: np.ndarray) -> dict:
     }
 
 
-def backtest(df: pd.DataFrame) -> pd.DataFrame:
+def frozen_fold_run(canonical: pd.DataFrame, features_all: pd.DataFrame,
+                    year: int) -> dict:
+    """
+    THE canonical benchmark fold (Phase 4): the frozen-state evaluator is
+    imported VERBATIM from blend_weight_search.fold_frozen_predictions — the
+    exact protocol validated on the 2006/2010 tune folds. One pre-tournament
+    snapshot; recorded venue flags; production prior; the Elo baseline runs on
+    the SAME frozen ratings with the same HFA on the same host rows, and keeps
+    its fold-specific draw rate (no leakage — training window only).
+    """
+    _require_complete_protocol()
+    from blend_weight_search import _blend, fold_frozen_predictions
+
+    fold_df, y, p_model, prior = fold_frozen_predictions(
+        canonical, features_all, year)
+    blend = _blend(ELO_BLEND_W, p_model, prior)
+
+    cutoff = fold_df["date"].min()
+    df_pre = features_all[features_all["date"] < cutoff]
+    draw_rate = float((df_pre["outcome"] == 1).mean())
+    base_frame = pd.DataFrame({
+        "home_elo": fold_df["frozen_home_elo"].values,
+        "away_elo": fold_df["frozen_away_elo"].values,
+        "neutral":  fold_df["neutral"].values,
+    })
+    elo = elo_baseline_proba(base_frame, draw_rate)
+
+    return {"year": year, "tournament": f"WC {year}", "fold_df": fold_df,
+            "y": y, "xgb": p_model, "blend": blend, "elo": elo,
+            "prior": prior, "draw_rate": draw_rate}
+
+
+def backtest(canonical: pd.DataFrame, features_all: pd.DataFrame) -> list:
+    """Canonical frozen-state benchmark over BACKTEST_YEARS (console table)."""
     _require_complete_protocol()
     rows = []
 
     for year in BACKTEST_YEARS:
-        wc_mask = (df["is_world_cup"] == 1) & (df["date"].dt.year == year)
-        df_wc = df[wc_mask].reset_index(drop=True)
-        if df_wc.empty:
-            print(f"  WC {year}: no matches found — skipping.")
-            continue
-
-        cutoff = df_wc["date"].min()
-        df_pre = df[df["date"] < cutoff].reset_index(drop=True)
-
-        print(f"  WC {year}: {len(df_wc)} matches | "
-              f"training on {len(df_pre):,} matches before {cutoff.date()} ...")
-
-        model, feature_cols = train_model(df_pre)
-
-        y_wc = df_wc["outcome"].values
-
-        # Naive Elo baseline — draw rate from the same pre-tournament window
-        # (no leakage). This stays fold-specific.
-        draw_rate = float((df_pre["outcome"] == 1).mean())
-        base_proba = elo_baseline_proba(df_wc, draw_rate)
-
-        # Production model = the EXACT deployed inference under the venue
-        # contract (train.predict_match_proba): neutral rows symmetry-average
-        # both orderings, host rows run single-orientation with the HFA prior,
-        # then blend with the fixed-0.227 Elo prior.
-        _, model_proba = deployed_model_and_blend(model, df_wc, feature_cols)
-
-        rows.append({"tournament": f"WC {year}", "n": len(df_wc),
-                     "model": evaluate_proba(y_wc, model_proba),
-                     "base":  evaluate_proba(y_wc, base_proba),
-                     "y": y_wc,
-                     "model_proba": model_proba,
-                     "base_proba": base_proba})
+        r = frozen_fold_run(canonical, features_all, year)
+        rows.append({"tournament": r["tournament"], "n": len(r["y"]),
+                     "model": evaluate_proba(r["y"], r["blend"]),
+                     "base":  evaluate_proba(r["y"], r["elo"]),
+                     "y": r["y"],
+                     "model_proba": r["blend"],
+                     "base_proba": r["elo"]})
 
     # Combined: pool all matches so per-sample metrics are exact
     y_all     = np.concatenate([r["y"] for r in rows])
@@ -241,11 +257,14 @@ def print_table(rows: list) -> None:
 
 
 def main() -> None:
-    print("Loading features.csv ...")
-    df = pd.read_csv(PROCESSED_DIR / "features.csv", parse_dates=["date"])
-    print(f"  {len(df):,} rows total\n")
+    from features import load_canonical_results
 
-    rows = backtest(df)
+    print("Loading canonical data + features.csv ...")
+    canonical = load_canonical_results()
+    df = pd.read_csv(PROCESSED_DIR / "features.csv", parse_dates=["date"])
+    print(f"  {len(df):,} feature rows total\n")
+
+    rows = backtest(canonical, df)
     print_table(rows)
 
 
