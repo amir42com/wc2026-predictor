@@ -1,8 +1,94 @@
 {
-  "fetched_at": "2026-07-13T12:40:55+00:00",
+  "fetched_at": "2026-07-16T13:23:49+00:00",
   "source": "football-data.org",
-  "n_matches": 100,
+  "n_matches": 102,
   "matches": [
+    {
+      "date": "2026-07-15",
+      "utc": "2026-07-15T19:00:00Z",
+      "home_team": "England",
+      "away_team": "Argentina",
+      "home_score": 1,
+      "away_score": 2,
+      "winner": "AWAY_TEAM",
+      "duration": "REGULAR",
+      "actual_outcome": 2,
+      "predicted_outcome": 2,
+      "p_home": 0.2711,
+      "p_draw": 0.2642,
+      "p_away": 0.4647,
+      "scorelines": [
+        [
+          1,
+          1,
+          0.1259
+        ],
+        [
+          0,
+          1,
+          0.0999
+        ],
+        [
+          1,
+          2,
+          0.0932
+        ],
+        [
+          0,
+          2,
+          0.0823
+        ],
+        [
+          0,
+          0,
+          0.0741
+        ]
+      ],
+      "correct": true
+    },
+    {
+      "date": "2026-07-14",
+      "utc": "2026-07-14T19:00:00Z",
+      "home_team": "France",
+      "away_team": "Spain",
+      "home_score": 0,
+      "away_score": 2,
+      "winner": "AWAY_TEAM",
+      "duration": "REGULAR",
+      "actual_outcome": 2,
+      "predicted_outcome": 2,
+      "p_home": 0.2814,
+      "p_draw": 0.2448,
+      "p_away": 0.4738,
+      "scorelines": [
+        [
+          1,
+          1,
+          0.1129
+        ],
+        [
+          1,
+          2,
+          0.0941
+        ],
+        [
+          0,
+          1,
+          0.0769
+        ],
+        [
+          0,
+          2,
+          0.072
+        ],
+        [
+          2,
+          1,
+          0.0702
+        ]
+      ],
+      "correct": true
+    },
     {
       "date": "2026-07-12",
       "utc": "2026-07-12T01:00:00Z",
