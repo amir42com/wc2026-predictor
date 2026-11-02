@@ -25,7 +25,7 @@
   "baseline": "no dev-standards bundle consumed by this repository; Personal OS Protocol v1.26 and DEC-151 public repository identity rule apply",
   "riskTier": "T2",
   "riskInputs": { "trustBoundaryChange": false, "publishedArtifactChange": true, "dataLossRisk": false, "rollbackCost": "low (branch work, revertible commits)" },
-  "exceptions": [ { "id": "EXC-1", "what": "AGENTS.md and CLAUDE.md exist locally but are gitignored, while Protocol v1.25 expects them tracked", "reason": "pre-existing state; adoption follows the DEC-151 order through normal authorized work", "revisit": "when ENT-306 merges fix/scientific-audit into master" } ],
+  "exceptions": [ { "id": "EXC-1", "what": "AGENTS.md and CLAUDE.md exist locally but are excluded from version control through .git/info/exclude, while Protocol v1.25 expects them tracked", "reason": "pre-existing state; adoption follows the DEC-151 order through normal authorized work", "revisit": "when ENT-306 merges fix/scientific-audit into master" } ],
   "invalidators": [ "HEAD no longer descends from baseCommit", "scope expands beyond the list above", "Protocol revision changes Preflight or Gate semantics for this class of work" ],
   "authorization": "owner approval 2026-11-02 in the project thread; Personal OS Update 40cb7da33f5081c69251db70bb35280b; DEC-166",
   "gateEvidence": "recorded after evaluation in reports/remediation_phase7.md"
