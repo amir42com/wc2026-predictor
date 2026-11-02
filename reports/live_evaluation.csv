@@ -1,0 +1,13 @@
+scope,system,n,n_prospective,n_retrospective,correct,accuracy,log_loss,brier,p_value,mean_diff,detail
+pooled,Blend,104,4,100,68.0,0.6538461538461539,0.8333754905532543,0.4872885728312471,,,
+pooled,Elo baseline,104,4,100,70.0,0.6730769230769231,0.8666327779476755,0.5073134279767285,,,
+pooled,McNemar exact (Blend vs Elo),104,4,100,,,,,0.5,,"b=0, c=2, discordant=2"
+pooled,Bootstrap logloss diff (Blend-Elo),104,4,100,,,,,,-0.03325728739442102,"95% CI [-0.059032, -0.005375], 10000 resamples, seed 12345"
+prospective,Blend,4,4,0,3.0,0.75,0.8922236768493846,0.524586419287965,,,
+prospective,Elo baseline,4,4,0,3.0,0.75,0.8695001076952613,0.5129364615605253,,,
+prospective,McNemar exact (Blend vs Elo),4,4,0,,,,,,,not applicable (n=4 < 30)
+prospective,Bootstrap logloss diff (Blend-Elo),4,4,0,,,,,,,not applicable (n=4 < 30)
+retrospective,Blend,100,0,100,65.0,0.65,0.8310215631014092,0.48579665897297836,,,
+retrospective,Elo baseline,100,0,100,67.0,0.67,0.8665180847577721,0.5070885066333766,,,
+retrospective,McNemar exact (Blend vs Elo),100,0,100,,,,,0.5,,"b=0, c=2, discordant=2"
+retrospective,Bootstrap logloss diff (Blend-Elo),100,0,100,,,,,,-0.035496521656362794,"95% CI [-0.062587, -0.006540], 10000 resamples, seed 12345"
