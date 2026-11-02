@@ -280,3 +280,50 @@ is merged.
    to delete it or mark it superseded.
 4. Two pre-existing em dashes remain in untouched helper docstrings of
    `src/make_figures.py` and one in a comment of `src/make_by_tournament.py`.
+
+## Merge, push and deploy (2026-11-02)
+
+- Owner authorization for the merge and redeploy was given on 2026-11-02
+  ("ادغام و استقرار را انجام بده", relayed at 07:17 UTC, 18:17 Sydney).
+- `git merge --no-ff fix/scientific-audit` on master: merge commit
+  **cab62ee** ("Merge the scientific-audit remediation and the final
+  tournament evaluation"); master was an ancestor of the branch, no
+  conflicts. On master: full suite **67 passed**, smoke test all checks
+  pass; serving files in the working tree equal the manifest (bundle
+  52752a62..., features cdbfc5a6...); ledger unchanged.
+- Push: the local permission policy refused a master push from the working
+  session as a production deploy, so the owner pushed from the laptop
+  terminal: `2b1e5d8..cab62ee master -> master`, pre-push version sync,
+  requirements drift guard and smoke test all passed (about 07:24 UTC,
+  18:24 Sydney). `origin/master` confirmed at cab62ee by `git fetch`.
+- Deploy observation, https://amir42-wc2026.streamlit.app in a browser on the
+  laptop:
+  - The app was asleep ("This app has gone to sleep due to inactivity").
+    Wake button pressed at 07:25:15 UTC; "Your app is waking up!", then the
+    app shell, then the full Match Predictor page by about 07:26:30 UTC:
+    **cold start about 75 seconds**. No build, dependency or hash error;
+    the frozen-state check passed (no "do not match
+    models/model-manifest.json" message).
+  - The new code is live: the page shows the Venue choice "Neutral venue
+    (World Cup)" / "Argentina at home".
+  - Match Predictor, Argentina v Spain, neutral venue: **35.7% / 26.4% /
+    37.9%**, equal to ledger M104 and the local check.
+  - Prediction Tracker: "Matches tracked 104", "104 finished so far";
+    "Correct predictions 65%, -2 pp vs Elo, 68 of 104"; "Model log-loss
+    0.833, -0.033 vs Elo"; the latest card is 2026-07-19 Spain 1-0
+    Argentina (38% / 26% / 36%), then 2026-07-18 France 4-6 England. These
+    match `reports/live_evaluation.csv`.
+
+## ENT-306 residuals found at deploy
+
+5. Tracker copy predates the end of the tournament: "Small sample, through
+   104 matches, expect these to swing", "LIVE WC 2026 RESULTS", and "Every
+   match below was predicted before the tournament began" (true of the frozen
+   pre-tournament state, but 100 of the 104 were computed after kickoff and
+   only 4 were ledgered beforehand). Align with the article wording in the
+   text task (ENT-307).
+6. The Venue choice inherits the app's navigation pill styling (the label in
+   a full-width bar, the options as pills). Cosmetic; tidy when the app's UI
+   is next touched.
+7. The app still describes itself as "v2.0 · June 2026" in the sidebar;
+   versioning is out of this task's scope.
