@@ -2,7 +2,7 @@
 Per-tournament breakdown of the WC backtest (supplementary to Figures 3-5).
 
 Splits the SAME 192 leakage-free match predictions (produced via the shared
-train.predict_neutral_proba inference and written to
+train.predict_match_proba inference and written to
 reports/backtest_predictions.csv by src/export_backtest.py) by tournament year,
 and scores all three systems with the IDENTICAL metric definitions used for the
 combined summary (export_backtest._metrics → accuracy, log-loss with labels

@@ -19,7 +19,7 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from simulate import GROUPS, Predictor, monte_carlo, simulate_group, resolve_r32
-from train import ELO_BLEND_W, elo_prior_proba, make_X
+from train import MatchContext, elo_prior_proba
 from scorelines import top_scorelines
 from explain import build_reasons
 import fetch_results
@@ -872,49 +872,32 @@ if page == "Match Predictor":
 
     st.checkbox(f"Show all {len(ALL_TEAMS)} teams", key="show_all_teams",
                 help="Off: only the 48 WC 2026 participants")
-    neutral = st.checkbox("Neutral venue (World Cup)", value=True)
+    venue = st.radio(
+        "Venue", ["neutral", "home"], horizontal=True,
+        format_func=lambda v: ("Neutral venue (World Cup)" if v == "neutral"
+                               else f"{home_team} at home"),
+        help="Neutral: both orderings averaged with the symmetric Elo prior. "
+             "At home: the home team gets home advantage (one orientation, "
+             "Elo prior shifted by the frozen home-advantage constant).")
 
     if home_team == away_team:
         st.warning("Select two different teams.")
         st.stop()
 
-    # ── feature row ────────────────────────────────────────────────────────
+    # ── team state (comparison table, head-to-head) ───────────────────────
     hs  = predictor._state.get(home_team, predictor._default_state())
     as_ = predictor._state.get(away_team, predictor._default_state())
     n_h2h, hwr = predictor._h2h_stats(home_team, away_team)
 
-    feat_row = {
-        "home_elo":           hs["elo"],
-        "away_elo":           as_["elo"],
-        "elo_diff":           hs["elo"] - as_["elo"],
-        "home_win_rate_5":    hs["win_rate_5"],
-        "away_win_rate_5":    as_["win_rate_5"],
-        "home_gd_5":          hs["gd_5"],
-        "away_gd_5":          as_["gd_5"],
-        "home_win_rate_10":   hs["win_rate_10"],
-        "away_win_rate_10":   as_["win_rate_10"],
-        "home_gd_10":         hs["gd_10"],
-        "away_gd_10":         as_["gd_10"],
-        "h2h_n":              n_h2h,
-        "h2h_home_wr":        hwr,
-        "home_conf_elo":      hs["conf_elo"],
-        "away_conf_elo":      as_["conf_elo"],
-        "neutral":            int(neutral),
-        "is_world_cup":       int(neutral),
-        "home_confederation": hs["confederation"],
-        "away_confederation": as_["confederation"],
-    }
-    X, _ = make_X(pd.DataFrame([feat_row]), bundle["feature_cols"])   # for SHAP (home orientation)
-    if neutral:
-        # Neutral World Cup match: use the EXACT shared deployed inference
-        # (symmetry-averaged + Elo-blended) so this page agrees with the
-        # simulator and tracker to the digit. Oriented home_team -> away_team.
-        proba = predictor.predict(home_team, away_team)
-    else:
-        # Home-advantage mode (user turned neutral off): single orientation,
-        # then the same Elo blend — averaging would cancel the home edge.
-        proba = bundle["model"].predict_proba(X)[0]   # [p_home_win, p_draw, p_away_win]
-        proba = ELO_BLEND_W * proba + (1 - ELO_BLEND_W) * elo_prior_proba(hs["elo"], as_["elo"])
+    # ── prediction (MatchContext contract, src/train.py) ──────────────────
+    # Neutral: Predictor.predict, identical to the simulator and tracker.
+    # At home: one orientation with home_team receiving home advantage and
+    # the Elo prior shifted by the frozen HFA constant.
+    ctx = MatchContext(home_team, away_team, neutral=(venue == "neutral"))
+    proba = predictor.predict_ctx(ctx)   # [p_home_win, p_draw, p_away_win]
+    # SHAP explains the raw model for the home orientation, with the same
+    # neutral flag the contract feeds the model.
+    X = predictor.feature_X(home_team, away_team, int(ctx.neutral))
     predicted_class = int(proba.argmax())
     outcome_labels  = [f"{home_team} Win", "Draw", f"{away_team} Win"]
 
