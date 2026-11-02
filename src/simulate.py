@@ -24,7 +24,8 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from scorelines import scoreline_grid
-from train import ELO_BLEND_W, elo_prior_proba, make_X, predict_neutral_proba
+from train import (ELO_BLEND_W, MatchContext, elo_prior_proba, make_X,
+                   predict_match_proba)
 from third_place_mapping import lookup as annexe_c_lookup, check_eligibility
 
 PROCESSED_DIR = Path(__file__).resolve().parents[1] / "data" / "processed"
@@ -208,8 +209,10 @@ class Predictor:
         )
         return n, hw / n
 
-    def feature_X(self, home: str, away: str) -> pd.DataFrame:
-        """Model-ready feature matrix for a single home-away fixture (one row)."""
+    def feature_X(self, home: str, away: str, neutral: int = 1) -> pd.DataFrame:
+        """Model-ready feature matrix for a single home-away fixture (one row).
+        Three-argument build_x of the MatchContext contract: `neutral` is the
+        flag predict_match_proba feeds the model (1 neutral, 0 host)."""
         hs  = self._state.get(home, self._default_state())
         as_ = self._state.get(away, self._default_state())
         n_h2h, hwr = self._h2h_stats(home, away)
@@ -229,7 +232,7 @@ class Predictor:
             "h2h_home_wr":       hwr,
             "home_conf_elo":     hs["conf_elo"],
             "away_conf_elo":     as_["conf_elo"],
-            "neutral":           1,
+            "neutral":           int(neutral),
             "is_world_cup":      1,
             "home_confederation":  hs["confederation"],
             "away_confederation":  as_["confederation"],
@@ -247,14 +250,30 @@ class Predictor:
             a, b = sorted([team_a, team_b])
             elo_a = self._state.get(a, self._default_state())["elo"]
             elo_b = self._state.get(b, self._default_state())["elo"]
-            # Shared deployed inference: symmetry-average both orderings, then
-            # blend toward the Elo-logistic prior. build_x = feature_X.
-            self._cache[key] = predict_neutral_proba(
-                self._model, self.feature_X, a, b, elo_a, elo_b)
+            # Shared deployed inference (MatchContext contract, neutral path):
+            # symmetry-average both orderings, then blend toward the
+            # Elo-logistic prior. build_x = feature_X.
+            self._cache[key] = predict_match_proba(
+                self._model, self.feature_X,
+                MatchContext(a, b, neutral=True), elo_a, elo_b)
 
         p = self._cache[key]
         a = min(team_a, team_b)
         return p if team_a == a else p[[2, 1, 0]]
+
+    def predict_ctx(self, ctx: MatchContext) -> np.ndarray:
+        """
+        P(home win, draw, away win) for ctx.home_team v ctx.away_team under the
+        MatchContext contract. A neutral fixture returns predict() (cached and
+        identical to the simulator and tracker to the digit); a host fixture
+        is a single orientation with ctx.home_team receiving home advantage
+        and the Elo prior shifted by the frozen HFA constant.
+        """
+        if ctx.neutral:
+            return self.predict(ctx.home_team, ctx.away_team)
+        elo_h = self._state.get(ctx.home_team, self._default_state())["elo"]
+        elo_a = self._state.get(ctx.away_team, self._default_state())["elo"]
+        return predict_match_proba(self._model, self.feature_X, ctx, elo_h, elo_a)
 
 
 # ── Group-stage helpers ────────────────────────────────────────────────────

@@ -198,23 +198,6 @@ def predict_match_proba(model, build_x, ctx: MatchContext,
     return blended / blended.sum()
 
 
-def predict_neutral_proba(model, build_x, team_a: str, team_b: str,
-                          elo_a: float, elo_b: float,
-                          blend_weight: float = ELO_BLEND_W,
-                          draw_rate: float = ELO_DRAW_RATE) -> np.ndarray:
-    """
-    DEPRECATED shim — the pre-Phase-2 neutral-only inference, kept so the
-    frozen serving path (simulate.Predictor, tracker, app) is byte-identical
-    until the serving rebuild phase. `build_x(home, away)` is the legacy
-    two-argument contract; the neutral flag it hardcodes internally is what
-    the neutral path fed the model before the contract existed. New code must
-    construct a MatchContext and call predict_match_proba.
-    """
-    ctx = MatchContext(team_a, team_b, neutral=True)
-    return predict_match_proba(model, lambda h, a, _n: build_x(h, a), ctx,
-                               elo_a, elo_b, blend_weight, draw_rate)
-
-
 def make_X(df: pd.DataFrame, feature_cols: list[str] | None = None) -> tuple[pd.DataFrame, list[str]]:
     """
     Build the model-ready feature matrix.

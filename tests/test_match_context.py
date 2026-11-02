@@ -2,8 +2,9 @@
 Phase 2 venue-contract tests.
 
 Covers: the MatchContext inference semantics (neutral symmetry vs host
-single-orientation), byte-equivalence of the deprecated predict_neutral_proba
-shim (the frozen serving path must be unchanged until the serving rebuild),
+single-orientation), the serving Predictor on the contract (neutral path
+unchanged to the digit, host path single orientation with the HFA prior,
+the four prospective ledger rows reproduced at full precision),
 the HFA fit recipe reproducing the frozen production constant, the venue
 parity of the Elo baseline, the PROTOCOL-INCOMPLETE gate, and the structural
 invariants of the provisional WC 2026 schedule table.
@@ -23,7 +24,7 @@ sys.path.insert(0, str(SRC))
 
 import backtest as bt  # noqa: E402
 import train  # noqa: E402
-from train import MatchContext, predict_match_proba, predict_neutral_proba  # noqa: E402
+from train import MatchContext, predict_match_proba  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -48,15 +49,72 @@ class StubModel:
 MODEL = StubModel()
 
 
-def test_neutral_shim_is_byte_identical():
-    """The deprecated shim must reproduce predict_match_proba's neutral path
-    exactly — the frozen serving path depends on it."""
-    legacy_build_x = lambda h, a: _build_x3(h, a, 1)  # noqa: E731 (serving hardcodes neutral=1)
-    old = predict_neutral_proba(MODEL, legacy_build_x, "Alpha", "Beta", 1600.0, 1500.0)
-    new = predict_match_proba(MODEL, _build_x3,
-                              MatchContext("Alpha", "Beta", neutral=True),
-                              1600.0, 1500.0)
-    assert np.array_equal(old, new)
+# ── serving Predictor on the contract (frozen bundle + serving snapshot) ──
+
+_SERVING = {}
+
+
+def _serving():
+    """Frozen bundle + Predictor + baseline draw rate, loaded once."""
+    if not _SERVING:
+        import prediction_ledger as pl
+        _SERVING["pl"] = pl
+        _SERVING["predictor"], _SERVING["bundle"], _SERVING["drb"] = pl.load_serving()
+    return _SERVING
+
+
+def test_predictor_neutral_path_unchanged_to_the_digit():
+    """Predictor.predict (simulator, tracker, app neutral venue) runs the
+    contract's neutral path and still returns the pre-migration values,
+    pinned at full precision from the frozen serving state."""
+    p = _serving()["predictor"]
+    pinned = {("Spain", "Argentina"): (0.3791248095427605, 0.2636637237272427,
+                                       0.35721146672999676),
+              ("Mexico", "South Africa"): (0.6739601506610556, 0.21488216887238873,
+                                           0.11115768046655565)}
+    for (a, b), want in pinned.items():
+        got = p.predict(a, b)
+        assert [repr(float(x)) for x in got] == [repr(x) for x in want], (a, b, got)
+        ctx_got = p.predict_ctx(MatchContext(a, b, neutral=True))
+        assert np.array_equal(ctx_got, got)
+
+
+def test_predictor_host_path_is_contract_host_path():
+    """A host fixture is ONE orientation with neutral=0 and the HFA-shifted
+    prior, exactly predict_match_proba's non-neutral path, and it raises the
+    host's win probability over the neutral read-out."""
+    p = _serving()["predictor"]
+    ctx = MatchContext("Mexico", "South Africa", neutral=False)
+    got = p.predict_ctx(ctx)
+    elo_h = p._state["Mexico"]["elo"]
+    elo_a = p._state["South Africa"]["elo"]
+    want = predict_match_proba(p._model, p.feature_X, ctx, elo_h, elo_a)
+    assert np.array_equal(got, want)
+    assert abs(got.sum() - 1.0) < 1e-12
+    neutral = p.predict("Mexico", "South Africa")
+    assert got[0] > neutral[0]
+    X = p.feature_X("Mexico", "South Africa", 0)
+    assert int(X["neutral"].iloc[0]) == 0 and int(X["is_world_cup"].iloc[0]) == 1
+
+
+def test_ledger_rows_reproduce_at_full_precision():
+    """The four prospective ledger rows (M101 to M104) are reproduced by
+    prediction_ledger's own functions on the frozen serving state, digit for
+    digit; the ledger file itself is never rewritten."""
+    s = _serving()
+    pl = s["pl"]
+    ledger = pd.read_csv(ROOT / "reports" / "prediction_ledger.csv", dtype=str)
+    assert list(ledger["fixture_id"]) == [f"WC2026-M10{i}" for i in range(1, 5)]
+    for _, r in ledger.iterrows():
+        ctx = pl.venue_context(r["fixture_id"].replace("WC2026-", ""),
+                               r["team_a"], r["team_b"])
+        blend, elo, home, away = pl.predict_pair(
+            s["predictor"], s["bundle"], r["team_a"], r["team_b"], ctx, s["drb"])
+        assert (home, away) == (r["team_a"], r["team_b"])
+        got = [repr(float(x)) for x in (*blend, *elo)]
+        want = [r["blend_a"], r["blend_draw"], r["blend_b"],
+                r["elo_a"], r["elo_draw"], r["elo_b"]]
+        assert got == want, (r["fixture_id"], got, want)
 
 
 def test_neutral_orientation_invariance():
