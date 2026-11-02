@@ -1,7 +1,8 @@
 """
 Phase 6b: live_evaluation logic on SYNTHETIC fixtures only — home win / draw /
 away win / extra-time / shootout-stripped / missing / duplicate / incomplete /
-exactly-104 final-mode gate. No model bundle loaded, no WC 2026 results read.
+exactly-104 final-mode gate (complete joins, no problems), per-tier metrics.
+No model bundle loaded, no WC 2026 results read.
 """
 
 import sys
@@ -95,8 +96,10 @@ def test_join_and_metrics():
     # hand-check blend pooled log-loss
     expected_ll = -np.mean(np.log([0.6, 0.5, 0.7]))
     assert abs(m["blend"]["log_loss"] - expected_ll) < 1e-12
-    assert m["mcnemar"]["b"] == 3 and m["mcnemar"]["c"] == 0
-    assert m["bootstrap"]["mean_diff"] < 0        # blend strictly better here
+    # 3 rows < MIN_PAIRED_N: paired tests are not applicable at this size
+    # (test_per_tier_metrics_hand_checked covers them with enough rows).
+    assert m["mcnemar"] is None and m["bootstrap"] is None
+    assert set(m["tiers"]) == {"prospective", "retrospective"}
 
 
 def test_join_flags_team_mismatch():
@@ -155,26 +158,151 @@ def test_semifinal_results_join_ledger_entries_as_prospective():
 
 # ── final mode ──────────────────────────────────────────────────────────────
 
-def test_final_mode_requires_exactly_104():
-    valid_103, _ = le.validate_results(
-        [_res(f"G{i}") for i in range(103)])
+def _complete(n):
+    """n synthetic finished fixtures, each with a matching prediction."""
+    records = [_res(f"G{i}") for i in range(n)]
+    valid, vprob = le.validate_results(records)
+    rows, jprob = le.join_predictions([_pred(f"G{i}") for i in range(n)], valid)
+    return records, valid, vprob, rows, jprob
+
+
+def _refusal(valid, rows, vprob, jprob, records):
     try:
-        le.final_mode_check(valid_103)
+        le.final_mode_check(valid, rows, vprob, jprob,
+                            record_ids=[r.get("fixture_id") for r in records])
     except RuntimeError as exc:
-        assert "final mode refused" in str(exc) and "103" in str(exc)
-    else:
-        raise AssertionError("final mode accepted 103 fixtures")
+        assert "final mode refused" in str(exc)
+        return str(exc)
+    raise AssertionError("final mode accepted an incomplete evaluation")
 
-    valid_104, _ = le.validate_results([_res(f"G{i}") for i in range(104)])
-    le.final_mode_check(valid_104)   # must not raise
 
-    valid_105, _ = le.validate_results([_res(f"G{i}") for i in range(105)])
-    try:
-        le.final_mode_check(valid_105)
-    except RuntimeError:
-        pass
-    else:
-        raise AssertionError("final mode accepted 105 fixtures")
+def test_final_mode_requires_exactly_104():
+    records, valid, vprob, rows, jprob = _complete(103)
+    assert "103 valid finished fixtures" in _refusal(valid, rows, vprob, jprob, records)
+
+    records, valid, vprob, rows, jprob = _complete(104)
+    le.final_mode_check(valid, rows, vprob, jprob,
+                        record_ids=[r["fixture_id"] for r in records])  # must not raise
+
+    records, valid, vprob, rows, jprob = _complete(105)
+    _refusal(valid, rows, vprob, jprob, records)
+
+
+def test_final_mode_refuses_join_problem_and_names_fixture():
+    """104 valid results, but one prediction's teams do not match its result:
+    103 joined rows plus a join problem must refuse, naming the fixture."""
+    records = [_res(f"G{i}") for i in range(104)]
+    valid, vprob = le.validate_results(records)
+    preds = [_pred(f"G{i}") for i in range(103)] + [_pred("G103", a="Gamma")]
+    rows, jprob = le.join_predictions(preds, valid)
+    assert len(valid) == 104 and len(rows) == 103 and len(jprob) == 1
+    msg = _refusal(valid, rows, vprob, jprob, records)
+    assert "103 joined rows" in msg and "unjoined: G103" in msg
+    assert "1 join problem(s)" in msg
+
+
+def test_final_mode_refuses_missing_prediction_and_names_fixture():
+    """A valid fixture with no prediction at all (no join problem raised)
+    still leaves the evaluation incomplete and must be named."""
+    records = [_res(f"G{i}") for i in range(104)]
+    valid, vprob = le.validate_results(records)
+    rows, jprob = le.join_predictions([_pred(f"G{i}") for i in range(1, 104)], valid)
+    assert not jprob and len(rows) == 103
+    assert "unjoined: G0" in _refusal(valid, rows, vprob, jprob, records)
+
+
+def test_final_mode_refuses_validation_problem_and_names_fixture():
+    """104 valid fixtures plus one invalid record (bad shootout strip) is not
+    complete: the validation problem refuses and the fixture is named."""
+    records = [_res(f"G{i}") for i in range(104)] + [
+        _res("BAD", hs=3, as_=0, duration="PENALTY_SHOOTOUT")]
+    valid, vprob = le.validate_results(records)
+    rows, jprob = le.join_predictions([_pred(f"G{i}") for i in range(104)], valid)
+    assert len(valid) == 104 and len(rows) == 104 and not jprob
+    msg = _refusal(valid, rows, vprob, jprob, records)
+    assert "not valid/finished: BAD" in msg and "1 validation problem(s)" in msg
+
+
+# ── per-tier metrics ────────────────────────────────────────────────────────
+
+def _tiered_rows():
+    """4 prospective rows (hand-checkable) + 30 identical retrospective rows."""
+    pro = [  # (fid, result home/away score, blend, elo)
+        ("P1", (2, 1), (0.6, 0.25, 0.15), (0.3, 0.3, 0.4)),   # y=0
+        ("P2", (1, 1), (0.2, 0.5, 0.3), (0.5, 0.2, 0.3)),     # y=1
+        ("P3", (0, 2), (0.1, 0.2, 0.7), (0.6, 0.2, 0.2)),     # y=2
+        ("P4", (0, 1), (0.5, 0.3, 0.2), (0.2, 0.3, 0.5)),     # y=2
+    ]
+    results = [_res(f, hs=s[0], as_=s[1]) for f, s, _, _ in pro]
+    preds = [_pred(f, blend=b, elo=e) for f, _, b, e in pro]
+    results += [_res(f"R{i}", hs=1, as_=0) for i in range(30)]           # y=0
+    preds += [_pred(f"R{i}", blend=(0.5, 0.3, 0.2), elo=(0.4, 0.25, 0.35),
+                    retro=True) for i in range(30)]
+    valid, vprob = le.validate_results(results)
+    rows, jprob = le.join_predictions(preds, valid)
+    assert not vprob and not jprob and len(rows) == 34
+    return rows
+
+
+def test_per_tier_metrics_hand_checked():
+    m = le.evaluate(_tiered_rows())
+    assert m["n"] == 34 and m["n_prospective"] == 4 and m["n_retrospective"] == 30
+
+    pro = m["tiers"]["prospective"]
+    assert pro["n"] == 4 and pro["n_prospective"] == 4 and pro["n_retrospective"] == 0
+    # Blend picks: P1 a, P2 draw, P3 b, P4 a (actual b) -> 3/4.
+    assert pro["blend"]["correct"] == 3 and pro["blend"]["accuracy"] == 0.75
+    assert abs(pro["blend"]["log_loss"]
+               - -np.mean(np.log([0.6, 0.5, 0.7, 0.2]))) < 1e-12
+    # Brier per row: .245, .38, .14, .98
+    assert abs(pro["blend"]["brier"] - 0.43625) < 1e-12
+    # Elo picks: P1 b, P2 a, P3 a, P4 b -> only P4 right.
+    assert pro["elo"]["correct"] == 1
+    assert abs(pro["elo"]["log_loss"]
+               - -np.mean(np.log([0.3, 0.2, 0.2, 0.5]))) < 1e-12
+    # Brier per row: .74, .98, 1.04, .38
+    assert abs(pro["elo"]["brier"] - 0.785) < 1e-12
+    assert pro["mcnemar"] is None and pro["bootstrap"] is None   # n=4 < 30
+
+    ret = m["tiers"]["retrospective"]
+    assert ret["n"] == 30 and ret["blend"]["correct"] == 30 and ret["elo"]["correct"] == 30
+    assert abs(ret["blend"]["log_loss"] - -np.log(0.5)) < 1e-12
+    assert abs(ret["elo"]["log_loss"] - -np.log(0.4)) < 1e-12
+    assert abs(ret["blend"]["brier"] - (0.25 + 0.09 + 0.04)) < 1e-12
+    assert abs(ret["elo"]["brier"] - (0.36 + 0.0625 + 0.1225)) < 1e-12
+    assert ret["mcnemar"]["b"] == 0 and ret["mcnemar"]["c"] == 0
+    # every per-row LL diff is log(0.4) - log(0.5) = log(0.8)
+    assert abs(ret["bootstrap"]["mean_diff"] - np.log(0.8)) < 1e-12
+
+    # pooled = the 34 rows together
+    assert m["blend"]["correct"] == 33 and m["elo"]["correct"] == 31
+    assert m["mcnemar"]["b"] == 3 and m["mcnemar"]["c"] == 1
+
+
+def test_tier_absent_when_no_rows():
+    rows = [r for r in _tiered_rows() if r["tier"] == "retrospective"]
+    m = le.evaluate(rows)
+    assert set(m["tiers"]) == {"retrospective"}
+
+
+def test_final_report_has_pooled_and_tier_blocks():
+    import pandas as pd
+    rows = _tiered_rows()
+    metrics = le.evaluate(rows)
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "live_evaluation.csv"
+        le.write_final_report(rows, metrics, path=out)
+        df = pd.read_csv(out)
+    assert list(df["scope"].unique()) == ["pooled", "prospective", "retrospective"]
+    assert (df.groupby("scope").size() == 4).all()
+    pro = df[df["scope"] == "prospective"].set_index("system")
+    assert pro.loc["Blend", "correct"] == 3 and pro.loc["Blend", "n"] == 4
+    assert "not applicable" in pro.loc["McNemar exact (Blend vs Elo)", "detail"]
+    assert pd.isna(pro.loc["McNemar exact (Blend vs Elo)", "p_value"])
+    ret = df[df["scope"] == "retrospective"].set_index("system")
+    assert ret.loc["McNemar exact (Blend vs Elo)", "p_value"] == 1.0
+    assert abs(ret.loc["Bootstrap logloss diff (Blend-Elo)", "mean_diff"]
+               - np.log(0.8)) < 1e-9
 
 
 def test_final_report_written_only_in_final_mode():
