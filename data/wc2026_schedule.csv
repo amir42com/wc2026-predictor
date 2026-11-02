@@ -1,0 +1,135 @@
+# WC 2026 match schedule — venue table for the MatchContext venue contract.
+# STATUS: PROVISIONAL (remediation Phase 2, drafted 2026-07-13). Do not treat
+# any row as authoritative until BOTH checks pass:
+#   (a) src/check_schedule_venues.py cross-checks drafted venues against the
+#       football-data.org venue fields at the next ROUTINE tracker refresh
+#       (matches already played: all of the group stage, R32, R16, QF);
+#   (b) manual fifa.com spot-check of the remaining unplayed fixtures
+#       (SF, third place, final).
+# Source: FIFA official match schedule (venue schedule released 2024-02-04;
+# team assignments per the 2025-12-05 draw), drafted from model knowledge —
+# NOT from a repo artifact — which is exactly why the verification gates exist.
+#
+# Field semantics:
+#   * confidence applies to venue_country — the only field inference consumes
+#     (host advantage requires a host team playing in its own country).
+#     stadium/venue_city are best-effort identifiers for the cross-check.
+#   * BLANK venue_country = unknown: consumers MUST fall back to neutral for
+#     that fixture and log the fallback (approved Checkpoint 2 semantics).
+#     Blanks are deliberate — unverifiable recall was left empty, not guessed.
+#   * The 9 host group rows have venue_country certain by construction: FIFA
+#     guarantees hosts play their group matches in their own country.
+#   * seq discriminates rows within a stage/matchday; it carries NO schedule
+#     meaning (which of a group-matchday's two fixtures is seq 1 is arbitrary,
+#     and R32 seq is NOT the simulate.R32_SLOTS index — that mapping lands
+#     with its own validation at the serving-rebuild phase).
+#   * match_number: official numbering; only filled where certain. Ranges:
+#     group stage 1-72, R32 73-88, R16 89-96, QF 97-100, SF 101-102,
+#     third place 103, final 104.
+#   * verified: empty until a check passes; the cross-check script writes
+#     "api" and the manual pass writes "fifa".
+stage,group,matchday,seq,match_number,date,stadium,venue_city,venue_country,host_team,confidence,verified
+group,A,1,1,1,2026-06-11,Estadio Azteca,Mexico City,Mexico,Mexico,high,
+group,A,1,2,,,,,,,unknown,
+group,A,2,1,,2026-06-18,Estadio Akron,Guadalajara,Mexico,Mexico,high,
+group,A,2,2,,,,,,,unknown,
+group,A,3,1,,2026-06-24,Estadio Azteca,Mexico City,Mexico,Mexico,high,
+group,A,3,2,,,,,,,unknown,
+group,B,1,1,,2026-06-12,BMO Field,Toronto,Canada,Canada,high,
+group,B,1,2,,,,,,,unknown,
+group,B,2,1,,2026-06-18,BC Place,Vancouver,Canada,Canada,high,
+group,B,2,2,,,,,,,unknown,
+group,B,3,1,,2026-06-24,BC Place,Vancouver,Canada,Canada,high,
+group,B,3,2,,,,,,,unknown,
+group,C,1,1,,,,,,,unknown,
+group,C,1,2,,,,,,,unknown,
+group,C,2,1,,,,,,,unknown,
+group,C,2,2,,,,,,,unknown,
+group,C,3,1,,,,,,,unknown,
+group,C,3,2,,,,,,,unknown,
+group,D,1,1,,2026-06-12,SoFi Stadium,Los Angeles,United States,United States,high,
+group,D,1,2,,,,,,,unknown,
+group,D,2,1,,2026-06-19,Lumen Field,Seattle,United States,United States,high,
+group,D,2,2,,,,,,,unknown,
+group,D,3,1,,2026-06-25,SoFi Stadium,Los Angeles,United States,United States,high,
+group,D,3,2,,,,,,,unknown,
+group,E,1,1,,,,,,,unknown,
+group,E,1,2,,,,,,,unknown,
+group,E,2,1,,,,,,,unknown,
+group,E,2,2,,,,,,,unknown,
+group,E,3,1,,,,,,,unknown,
+group,E,3,2,,,,,,,unknown,
+group,F,1,1,,,,,,,unknown,
+group,F,1,2,,,,,,,unknown,
+group,F,2,1,,,,,,,unknown,
+group,F,2,2,,,,,,,unknown,
+group,F,3,1,,,,,,,unknown,
+group,F,3,2,,,,,,,unknown,
+group,G,1,1,,,,,,,unknown,
+group,G,1,2,,,,,,,unknown,
+group,G,2,1,,,,,,,unknown,
+group,G,2,2,,,,,,,unknown,
+group,G,3,1,,,,,,,unknown,
+group,G,3,2,,,,,,,unknown,
+group,H,1,1,,,,,,,unknown,
+group,H,1,2,,,,,,,unknown,
+group,H,2,1,,,,,,,unknown,
+group,H,2,2,,,,,,,unknown,
+group,H,3,1,,,,,,,unknown,
+group,H,3,2,,,,,,,unknown,
+group,I,1,1,,,,,,,unknown,
+group,I,1,2,,,,,,,unknown,
+group,I,2,1,,,,,,,unknown,
+group,I,2,2,,,,,,,unknown,
+group,I,3,1,,,,,,,unknown,
+group,I,3,2,,,,,,,unknown,
+group,J,1,1,,,,,,,unknown,
+group,J,1,2,,,,,,,unknown,
+group,J,2,1,,,,,,,unknown,
+group,J,2,2,,,,,,,unknown,
+group,J,3,1,,,,,,,unknown,
+group,J,3,2,,,,,,,unknown,
+group,K,1,1,,,,,,,unknown,
+group,K,1,2,,,,,,,unknown,
+group,K,2,1,,,,,,,unknown,
+group,K,2,2,,,,,,,unknown,
+group,K,3,1,,,,,,,unknown,
+group,K,3,2,,,,,,,unknown,
+group,L,1,1,,,,,,,unknown,
+group,L,1,2,,,,,,,unknown,
+group,L,2,1,,,,,,,unknown,
+group,L,2,2,,,,,,,unknown,
+group,L,3,1,,,,,,,unknown,
+group,L,3,2,,,,,,,unknown,
+R32,,,1,,,,,,,unknown,
+R32,,,2,,,,,,,unknown,
+R32,,,3,,,,,,,unknown,
+R32,,,4,,,,,,,unknown,
+R32,,,5,,,,,,,unknown,
+R32,,,6,,,,,,,unknown,
+R32,,,7,,,,,,,unknown,
+R32,,,8,,,,,,,unknown,
+R32,,,9,,,,,,,unknown,
+R32,,,10,,,,,,,unknown,
+R32,,,11,,,,,,,unknown,
+R32,,,12,,,,,,,unknown,
+R32,,,13,,,,,,,unknown,
+R32,,,14,,,,,,,unknown,
+R32,,,15,,,,,,,unknown,
+R32,,,16,,,,,,,unknown,
+R16,,,1,,,,,,,unknown,
+R16,,,2,,,,,,,unknown,
+R16,,,3,,,,,,,unknown,
+R16,,,4,,,,,,,unknown,
+R16,,,5,,,,,,,unknown,
+R16,,,6,,,,,,,unknown,
+R16,,,7,,,,,,,unknown,
+R16,,,8,,,,,,,unknown,
+QF,,,1,,2026-07-09,Gillette Stadium,Boston,United States,,high,
+QF,,,2,,2026-07-10,SoFi Stadium,Los Angeles,United States,,high,
+QF,,,3,,2026-07-11,Arrowhead Stadium,Kansas City,United States,,high,
+QF,,,4,,2026-07-11,Hard Rock Stadium,Miami,United States,,high,
+SF,,,1,101,2026-07-14,AT&T Stadium,Dallas,United States,,high,
+SF,,,2,102,2026-07-15,Mercedes-Benz Stadium,Atlanta,United States,,high,
+third_place,,,1,103,2026-07-18,Hard Rock Stadium,Miami,United States,,high,
+final,,,1,104,2026-07-19,MetLife Stadium,New York/New Jersey,United States,,high,

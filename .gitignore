@@ -22,13 +22,21 @@ ENV/
 
 # Data — raw downloads are large; only track processed artifacts
 data/raw/
-data/processed/
+data/processed/*
 
 # Models & artifacts
-models/
+models/*
 *.pkl
 *.joblib
 *.h5
+
+# Frozen serving state, tracked so the deployed app serves the exact bundle
+# recorded in models/model-manifest.json instead of retraining at cold start.
+!data/processed/features.csv
+!data/processed/elo_ratings.csv
+!data/processed/team_state.csv
+!models/model-manifest.json
+!models/xgb_wc2026.joblib
 
 # Streamlit
 .streamlit/secrets.toml

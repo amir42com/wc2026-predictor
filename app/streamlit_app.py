@@ -18,9 +18,8 @@ import shap
 import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-from simulate import (GROUPS, Predictor, monte_carlo, simulate_group, resolve_r32,
-                      PRE_TOURNAMENT_CUTOFF)
-from train import ELO_BLEND_W, elo_prior_proba, make_X
+from simulate import GROUPS, Predictor, monte_carlo, simulate_group, resolve_r32
+from train import MatchContext, elo_prior_proba
 from scorelines import top_scorelines
 from explain import build_reasons
 import fetch_results
@@ -29,7 +28,7 @@ RESULTS_PATH = Path(__file__).resolve().parents[1] / "data" / "wc2026_results.js
 
 PROCESSED_DIR = Path(__file__).resolve().parents[1] / "data" / "processed"
 MODELS_DIR    = Path(__file__).resolve().parents[1] / "models"
-RAW_DIR       = Path(__file__).resolve().parents[1] / "data" / "raw"
+MANIFEST_PATH = MODELS_DIR / "model-manifest.json"
 
 WC_TEAMS = sorted({t for teams in GROUPS.values() for t in teams})
 
@@ -168,75 +167,43 @@ def load_resources():
     return bundle, predictor, explainer, elo_df
 
 
-# ── first-run bootstrap ───────────────────────────────────────────────────
+# ── frozen serving state ──────────────────────────────────────────────────
+# The app serves the FROZEN bundle and serving snapshot that are tracked in
+# the repository (the same files that produced the prediction ledger). It
+# never retrains at cold start: a rebuild from today's upstream data, or from
+# a different feature path, gives a different model (Phase 7, ENT-306).
 
-def _bootstrap_if_needed() -> None:
-    """
-    On Streamlit Cloud (or any cold start) the processed data and model
-    files won't exist.  This runs the full pipeline once, showing progress
-    in the UI, then calls st.rerun() so the app loads normally.
-    """
-    missing_raw      = not (RAW_DIR / "results.csv").exists()
-    missing_features = not (PROCESSED_DIR / "features.csv").exists()
-    missing_model    = not (MODELS_DIR / "xgb_wc2026.joblib").exists()
+@st.cache_resource
+def _frozen_state_problems() -> list[str]:
+    """Empty when every serving file exists and the bundle and features.csv
+    match the sha256 values recorded in models/model-manifest.json."""
+    import hashlib
 
-    if not (missing_raw or missing_features or missing_model):
-        return  # everything already present
+    files = [MODELS_DIR / "xgb_wc2026.joblib", PROCESSED_DIR / "features.csv",
+             PROCESSED_DIR / "elo_ratings.csv", PROCESSED_DIR / "team_state.csv",
+             MANIFEST_PATH]
+    problems = [f"missing {p.name}" for p in files if not p.exists()]
+    if problems:
+        return problems
+    manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+    for path, key in ((MODELS_DIR / "xgb_wc2026.joblib", "bundle_sha256"),
+                      (PROCESSED_DIR / "features.csv", "features_csv_sha256")):
+        if hashlib.sha256(path.read_bytes()).hexdigest() != manifest[key]:
+            problems.append(f"{path.name} does not match {key} in model-manifest.json")
+    return problems
 
-    import fetch_data as _fd
-    import features  as _feat
-    import train     as _tr
 
-    st.title("⚽ WC 2026 Predictor")
-    with st.status("First-run setup — this takes ~2 minutes…", expanded=True) as _s:
-
-        if missing_raw:
-            st.write("Downloading match data from GitHub (1872–2026)…")
-            RAW_DIR.mkdir(parents=True, exist_ok=True)
-            _fd.main()
-            st.write("Data downloaded.")
-
-        if missing_features:
-            st.write("Engineering features (Elo, form, H2H, confederation)…")
-            PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
-            _df = (
-                pd.read_csv(RAW_DIR / "results.csv", parse_dates=["date"])
-                .dropna(subset=["home_score", "away_score"])
-                .sort_values("date")
-                .reset_index(drop=True)
-            )
-            # Leakage cutoff: the live martj42 feed gains 2026 WC results during
-            # the tournament. Truncate raw data strictly before the cutoff BEFORE
-            # building features/Elo so a cold-start rebuild can never fold a
-            # tournament result into the deployed model state (features.csv,
-            # elo_ratings.csv and the trained model are all pre-tournament).
-            _df = _df[_df["date"] < PRE_TOURNAMENT_CUTOFF].reset_index(drop=True)
-            feat_df, elo_df, state_df = _feat.build_features(
-                _df, state_cutoff=PRE_TOURNAMENT_CUTOFF)
-            feat_df.to_csv( PROCESSED_DIR / "features.csv",    index=False)
-            elo_df.to_csv(  PROCESSED_DIR / "elo_ratings.csv", index=False)
-            state_df.to_csv(PROCESSED_DIR / "team_state.csv",  index=False)
-            st.write(f"Features built: {len(feat_df):,} matches.")
-
-        if missing_model:
-            st.write("Training XGBoost model (~30 seconds)…")
-            MODELS_DIR.mkdir(parents=True, exist_ok=True)
-            _df2 = pd.read_csv(PROCESSED_DIR / "features.csv", parse_dates=["date"])
-            # Ship a model trained on ALL pre-tournament data (1872–2026), not
-            # the pre-2018 eval slice — same logic as src/train.py main().
-            model, feature_cols = _tr.train_model(
-                _df2[_tr.production_mask(_df2)].reset_index(drop=True))
-            _bundle = {
-                "model":        model,
-                "feature_cols": feature_cols,
-                "label_map":    _tr.LABEL_MAP,
-            }
-            joblib.dump(_bundle, MODELS_DIR / "xgb_wc2026.joblib")
-            st.write("Model trained and saved.")
-
-        _s.update(label="Setup complete — loading app…", state="complete")
-
-    st.rerun()
+def _require_frozen_serving_state() -> None:
+    """Stop with an explanation instead of serving a model that is not the
+    frozen, manifest-verified one."""
+    problems = _frozen_state_problems()
+    if not problems:
+        return
+    st.title("WC 2026 Predictor")
+    st.error("The frozen model and serving data are missing or do not match "
+             "models/model-manifest.json, so no predictions are served. "
+             "Details: " + "; ".join(problems))
+    st.stop()
 
 
 # ── page config ────────────────────────────────────────────────────────────
@@ -258,7 +225,7 @@ st.set_page_config(
     },
 )
 
-_bootstrap_if_needed()
+_require_frozen_serving_state()
 
 bundle, predictor, explainer, elo_df = load_resources()
 ALL_TEAMS = sorted(predictor._state.keys())
@@ -905,49 +872,32 @@ if page == "Match Predictor":
 
     st.checkbox(f"Show all {len(ALL_TEAMS)} teams", key="show_all_teams",
                 help="Off: only the 48 WC 2026 participants")
-    neutral = st.checkbox("Neutral venue (World Cup)", value=True)
+    venue = st.radio(
+        "Venue", ["neutral", "home"], horizontal=True,
+        format_func=lambda v: ("Neutral venue (World Cup)" if v == "neutral"
+                               else f"{home_team} at home"),
+        help="Neutral: both orderings averaged with the symmetric Elo prior. "
+             "At home: the home team gets home advantage (one orientation, "
+             "Elo prior shifted by the frozen home-advantage constant).")
 
     if home_team == away_team:
         st.warning("Select two different teams.")
         st.stop()
 
-    # ── feature row ────────────────────────────────────────────────────────
+    # ── team state (comparison table, head-to-head) ───────────────────────
     hs  = predictor._state.get(home_team, predictor._default_state())
     as_ = predictor._state.get(away_team, predictor._default_state())
     n_h2h, hwr = predictor._h2h_stats(home_team, away_team)
 
-    feat_row = {
-        "home_elo":           hs["elo"],
-        "away_elo":           as_["elo"],
-        "elo_diff":           hs["elo"] - as_["elo"],
-        "home_win_rate_5":    hs["win_rate_5"],
-        "away_win_rate_5":    as_["win_rate_5"],
-        "home_gd_5":          hs["gd_5"],
-        "away_gd_5":          as_["gd_5"],
-        "home_win_rate_10":   hs["win_rate_10"],
-        "away_win_rate_10":   as_["win_rate_10"],
-        "home_gd_10":         hs["gd_10"],
-        "away_gd_10":         as_["gd_10"],
-        "h2h_n":              n_h2h,
-        "h2h_home_wr":        hwr,
-        "home_conf_elo":      hs["conf_elo"],
-        "away_conf_elo":      as_["conf_elo"],
-        "neutral":            int(neutral),
-        "is_world_cup":       int(neutral),
-        "home_confederation": hs["confederation"],
-        "away_confederation": as_["confederation"],
-    }
-    X, _ = make_X(pd.DataFrame([feat_row]), bundle["feature_cols"])   # for SHAP (home orientation)
-    if neutral:
-        # Neutral World Cup match: use the EXACT shared deployed inference
-        # (symmetry-averaged + Elo-blended) so this page agrees with the
-        # simulator and tracker to the digit. Oriented home_team -> away_team.
-        proba = predictor.predict(home_team, away_team)
-    else:
-        # Home-advantage mode (user turned neutral off): single orientation,
-        # then the same Elo blend — averaging would cancel the home edge.
-        proba = bundle["model"].predict_proba(X)[0]   # [p_home_win, p_draw, p_away_win]
-        proba = ELO_BLEND_W * proba + (1 - ELO_BLEND_W) * elo_prior_proba(hs["elo"], as_["elo"])
+    # ── prediction (MatchContext contract, src/train.py) ──────────────────
+    # Neutral: Predictor.predict, identical to the simulator and tracker.
+    # At home: one orientation with home_team receiving home advantage and
+    # the Elo prior shifted by the frozen HFA constant.
+    ctx = MatchContext(home_team, away_team, neutral=(venue == "neutral"))
+    proba = predictor.predict_ctx(ctx)   # [p_home_win, p_draw, p_away_win]
+    # SHAP explains the raw model for the home orientation, with the same
+    # neutral flag the contract feeds the model.
+    X = predictor.feature_X(home_team, away_team, int(ctx.neutral))
     predicted_class = int(proba.argmax())
     outcome_labels  = [f"{home_team} Win", "Draw", f"{away_team} Win"]
 

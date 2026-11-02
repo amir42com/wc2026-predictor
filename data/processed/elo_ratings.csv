@@ -1,0 +1,337 @@
+team,elo,confederation
+Spain,2091.1,UEFA
+Argentina,2081.5,CONMEBOL
+France,2021.1,UEFA
+Portugal,1992.5,UEFA
+Germany,1986.0,UEFA
+England,1974.4,UEFA
+Brazil,1970.2,CONMEBOL
+Colombia,1957.6,CONMEBOL
+Japan,1949.3,AFC
+Netherlands,1947.9,UEFA
+Morocco,1946.8,CAF
+Ecuador,1933.4,CONMEBOL
+Turkey,1922.8,UEFA
+Italy,1921.5,UEFA
+Croatia,1917.7,UEFA
+Mexico,1916.2,CONCACAF
+Belgium,1907.1,UEFA
+Norway,1894.5,UEFA
+Switzerland,1887.1,UEFA
+Denmark,1886.2,UEFA
+Austria,1878.0,UEFA
+Uruguay,1873.6,CONMEBOL
+Algeria,1858.9,CAF
+Canada,1849.3,CONCACAF
+United States,1840.3,CONCACAF
+South Korea,1839.2,AFC
+Iran,1837.7,AFC
+Senegal,1836.8,CAF
+Paraguay,1834.2,CONMEBOL
+Basque Country,1833.6,Other
+Australia,1818.5,AFC
+Russia,1810.9,UEFA
+Czech Republic,1806.0,UEFA
+Ivory Coast,1798.7,CAF
+Ukraine,1797.5,UEFA
+Hungary,1793.7,UEFA
+Nigeria,1789.2,CAF
+Scotland,1785.2,UEFA
+Poland,1778.9,UEFA
+Egypt,1775.0,CAF
+Sweden,1773.6,UEFA
+Chile,1771.7,CONMEBOL
+Venezuela,1768.0,CONMEBOL
+Uzbekistan,1767.1,AFC
+Serbia,1764.2,UEFA
+Greece,1762.5,UEFA
+Jersey,1759.2,Other
+Republic of Ireland,1750.9,UEFA
+Yugoslavia,1749.0,Other
+Catalonia,1748.9,Other
+Kosovo,1743.2,UEFA
+Panama,1741.7,CONCACAF
+Slovenia,1736.8,UEFA
+German DR,1732.0,Other
+Czechoslovakia,1724.0,Other
+Slovakia,1714.5,UEFA
+Iraq,1712.9,AFC
+DR Congo,1703.8,CAF
+Peru,1701.1,CONMEBOL
+Wales,1700.8,UEFA
+Jordan,1697.3,AFC
+Georgia,1691.8,UEFA
+Tunisia,1687.6,CAF
+Guernsey,1687.1,Other
+Romania,1678.6,UEFA
+Ynys Môn,1676.7,Other
+Saudi Arabia,1675.4,AFC
+Cameroon,1674.2,CAF
+Israel,1673.2,UEFA
+Isle of Man,1663.5,Other
+Costa Rica,1663.4,CONCACAF
+Occitania,1662.0,Other
+Andalusia,1661.2,Other
+Bosnia and Herzegovina,1655.9,UEFA
+Northern Cyprus,1655.0,Other
+Mali,1654.1,CAF
+Northern Ireland,1649.6,UEFA
+Bolivia,1649.2,CONMEBOL
+United Arab Emirates,1646.8,AFC
+South Africa,1645.8,CAF
+Isle of Wight,1640.2,Other
+Albania,1635.0,UEFA
+Honduras,1634.3,CONCACAF
+New Zealand,1633.2,OFC
+Cape Verde,1630.9,CAF
+Padania,1630.1,Other
+Kernow,1627.0,Other
+Burkina Faso,1622.4,CAF
+North Macedonia,1622.0,UEFA
+Iraqi Kurdistan,1614.9,Other
+Iceland,1614.6,UEFA
+Haiti,1611.5,CONCACAF
+Jamaica,1610.1,CONCACAF
+Abkhazia,1609.9,Other
+Belarus,1599.5,UEFA
+Corsica,1597.2,Other
+County of Nice,1591.1,Other
+Rhodes,1589.1,Other
+Kárpátalja,1588.4,Other
+Guatemala,1584.6,CONCACAF
+Finland,1580.3,UEFA
+Oman,1576.9,AFC
+Yorkshire,1571.6,Other
+Ghana,1571.5,CAF
+Montenegro,1571.3,UEFA
+Galicia,1568.1,Other
+Angola,1566.3,CAF
+Tamil Eelam,1565.4,Other
+Qatar,1564.5,AFC
+Ellan Vannin,1563.0,Other
+Artsakh,1562.1,Other
+Kurdistan,1560.9,Other
+China,1552.0,AFC
+Arameans Suryoye,1546.9,Other
+Réunion,1545.5,Other
+Suriname,1545.4,CONCACAF
+Thailand,1541.3,AFC
+Bulgaria,1541.3,UEFA
+Zanzibar,1540.5,Other
+Libya,1538.5,CAF
+Malaysia,1538.4,AFC
+Maule Sur,1537.6,Other
+Cascadia,1537.2,Other
+Panjab,1536.1,Other
+Syria,1535.8,AFC
+Brittany,1533.5,Other
+Canary Islands,1531.1,Other
+Vietnam,1530.1,AFC
+Palestine,1529.9,AFC
+Curaçao,1527.1,CONCACAF
+New Caledonia,1526.9,OFC
+Elba Island,1526.3,Other
+Biafra,1522.2,Other
+Asturias,1522.2,Other
+Indonesia,1521.8,AFC
+Menorca,1521.7,Other
+Silesia,1521.3,Other
+Chameria,1520.3,Other
+Surrey,1517.5,Other
+Parishes of Jersey,1517.4,Other
+Gabon,1515.3,CAF
+Donetsk PR,1513.6,Other
+Guinea,1512.1,CAF
+Zambia,1510.5,CAF
+Felvidék,1509.6,Other
+Quebec,1509.3,Other
+Crimea,1508.3,Other
+Benin,1506.7,CAF
+Bahrain,1506.5,AFC
+Luxembourg,1505.0,UEFA
+Kazakhstan,1504.5,UEFA
+Franconia,1502.4,Other
+Central Spain,1502.1,Other
+Gambia,1501.9,CAF
+Mapuche,1501.2,Other
+Togo,1500.2,CAF
+Matabeleland,1498.9,Other
+Kuwait,1498.8,AFC
+Saugeais,1496.8,Other
+Madagascar,1496.0,CAF
+Trinidad and Tobago,1495.2,CONCACAF
+Sealand,1495.2,Other
+Uganda,1494.9,CAF
+Délvidék,1494.2,Other
+United Koreans in Japan,1493.8,Other
+Tahiti,1492.3,OFC
+Guadeloupe,1491.0,Other
+Madrid,1488.1,Other
+Western Armenia,1483.5,Other
+Luhansk PR,1482.3,Other
+Estonia,1482.2,UEFA
+South Ossetia,1481.6,Other
+Cilento,1481.6,Other
+Comoros,1481.4,CAF
+North Korea,1480.4,AFC
+Ryūkyū,1479.5,Other
+Shetland,1479.1,Other
+Yoruba Nation,1478.8,Other
+Somaliland,1478.5,Other
+Seborga,1478.5,Other
+Gozo,1476.5,Other
+Székely Land,1475.4,Other
+Åland Islands,1474.6,Other
+Republic of St. Pauli,1473.7,Other
+Rwanda,1473.4,CAF
+West Papua,1472.5,Other
+East Turkestan,1471.5,Other
+Hmong,1470.6,Other
+El Salvador,1470.5,CONCACAF
+Mauritania,1470.1,CAF
+Kenya,1469.9,CAF
+Niue,1469.8,Other
+South Yemen,1468.2,Other
+Faroe Islands,1466.7,UEFA
+Nicaragua,1465.8,CONCACAF
+Mozambique,1465.3,CAF
+Kabylia,1464.6,Other
+Chechnya,1462.5,Other
+North Vietnam,1461.9,Other
+Aymara,1461.2,Other
+Romani people,1459.7,Other
+Kyrgyzstan,1459.7,AFC
+Papua New Guinea,1459.3,OFC
+Armenia,1457.8,UEFA
+Sudan,1456.5,CAF
+Dominican Republic,1455.7,CONCACAF
+Guyana,1455.7,CONCACAF
+Monaco,1454.2,Other
+Sápmi,1453.7,Other
+Zimbabwe,1452.2,CAF
+Malta,1447.3,UEFA
+Cyprus,1447.2,UEFA
+Ticino,1446.6,Other
+Greenland,1445.7,Other
+Niger,1444.2,CAF
+Saarland,1443.6,Other
+Palau,1443.2,Other
+Provence,1442.8,Other
+Manchukuo,1442.5,Other
+Găgăuzia,1442.2,Other
+Western Isles,1442.2,Other
+Western Sahara,1439.4,Other
+Vanuatu,1438.8,OFC
+Azerbaijan,1435.1,UEFA
+Equatorial Guinea,1434.7,CAF
+Tajikistan,1433.7,AFC
+Two Sicilies,1430.3,Other
+Martinique,1428.9,Other
+Sierra Leone,1428.8,CAF
+Marshall Islands,1427.0,Other
+Orkney,1424.9,Other
+Botswana,1424.9,Other
+Mayotte,1424.6,Other
+Lebanon,1423.3,AFC
+Sark,1423.2,Other
+Gotland,1416.8,Other
+Barawa,1416.3,Other
+Ethiopia,1411.6,CAF
+Ambazonia,1407.8,Other
+Malawi,1404.0,CAF
+Raetia,1403.9,Other
+Vietnam Republic,1402.2,Other
+Liberia,1398.8,Other
+Vatican City,1394.3,Other
+Western Australia,1393.8,Other
+Burundi,1392.8,Other
+Namibia,1392.7,CAF
+Fiji,1391.6,OFC
+Lesotho,1390.5,Other
+Yemen DPR,1390.2,Other
+Turkmenistan,1390.0,Other
+Micronesia,1390.0,Other
+Saint Barthélemy,1387.9,Other
+Cuba,1387.0,CONCACAF
+Tanzania,1384.4,CAF
+Moldova,1384.1,UEFA
+French Guiana,1383.2,Other
+Latvia,1380.4,UEFA
+Darfur,1380.3,Other
+Lithuania,1379.0,UEFA
+Saint Vincent and the Grenadines,1376.0,Other
+Philippines,1375.4,AFC
+Bermuda,1371.6,CONCACAF
+Saint Pierre and Miquelon,1368.3,Other
+Hitra,1366.5,Other
+Saint Helena,1365.8,Other
+Puerto Rico,1365.0,Other
+Central African Republic,1364.8,CAF
+Chagos Islands,1362.6,Other
+Guinea-Bissau,1360.3,Other
+Saare County,1351.6,Other
+Solomon Islands,1346.2,OFC
+Singapore,1342.8,AFC
+Congo,1337.7,CAF
+Kiribati,1331.4,Other
+Hong Kong,1329.7,AFC
+Wallis Islands and Futuna,1321.1,Other
+Eswatini,1319.4,Other
+Sint Maarten,1317.3,Other
+Saint Kitts and Nevis,1309.5,Other
+Grenada,1308.0,Other
+Belize,1307.2,CONCACAF
+Yemen,1306.8,AFC
+South Sudan,1292.3,Other
+Samoa,1285.7,OFC
+Tibet,1280.7,Other
+Saint Martin,1274.7,Other
+India,1272.9,AFC
+Montserrat,1270.3,Other
+Tuvalu,1269.5,Other
+Saint Lucia,1269.4,Other
+Chad,1267.2,Other
+Falkland Islands,1259.6,Other
+Mauritius,1243.3,Other
+Gibraltar,1237.5,UEFA
+Frøya,1232.9,Other
+Aruba,1222.1,Other
+Andorra,1219.4,UEFA
+Eritrea,1218.3,Other
+Cook Islands,1210.2,OFC
+Bangladesh,1208.9,AFC
+Myanmar,1206.2,AFC
+São Tomé and Príncipe,1196.0,Other
+Dominica,1193.6,Other
+Bonaire,1183.3,Other
+Antigua and Barbuda,1179.8,Other
+Nepal,1171.5,AFC
+Afghanistan,1168.7,AFC
+Barbados,1164.0,CONCACAF
+Taiwan,1157.7,Other
+Cambodia,1156.0,AFC
+Turks and Caicos Islands,1143.9,Other
+Cayman Islands,1142.6,Other
+Tonga,1139.3,OFC
+Pakistan,1135.3,AFC
+Alderney,1130.6,Other
+Djibouti,1116.9,Other
+British Virgin Islands,1110.4,Other
+Somalia,1107.5,Other
+Sri Lanka,1099.1,AFC
+Liechtenstein,1095.2,UEFA
+Northern Mariana Islands,1075.4,Other
+United States Virgin Islands,1072.9,Other
+Maldives,1057.2,AFC
+Seychelles,1052.5,Other
+American Samoa,1050.5,OFC
+Mongolia,1048.9,AFC
+Bahamas,1041.4,Other
+Laos,1039.0,Other
+Guam,1038.8,AFC
+San Marino,1011.7,UEFA
+Anguilla,1007.7,Other
+Brunei,1002.9,Other
+Timor-Leste,956.8,Other
+Bhutan,930.3,Other
+Macau,928.6,AFC
