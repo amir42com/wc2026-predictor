@@ -6,3 +6,8 @@ scripts/pre-push   text eol=lf
 # Generated export consumed by Streamlit Cloud (Linux). uv writes it as LF;
 # pinning eol=lf stops autocrlf from rewriting it and causing false diff churn.
 requirements.txt   text eol=lf
+
+# Frozen serving state is hashed byte for byte in models/model-manifest.json
+# (the CSVs were written with CRLF on Windows): no line-ending conversion.
+data/processed/*.csv    -text
+models/xgb_wc2026.joblib -text
