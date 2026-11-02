@@ -265,7 +265,9 @@ def write_final_report(rows: list[dict], metrics: dict, path: Path = OUT_PATH) -
     cols = ["scope", "system", "n", "n_prospective", "n_retrospective",
             "correct", "accuracy", "log_loss", "brier", "p_value", "mean_diff",
             "detail"]
-    pd.DataFrame(recs, columns=cols).to_csv(path, index=False)
+    df = pd.DataFrame(recs, columns=cols)
+    df["correct"] = df["correct"].astype("Int64")   # counts, blank on test rows
+    df.to_csv(path, index=False)
     print(f"wrote {path}")
 
 
