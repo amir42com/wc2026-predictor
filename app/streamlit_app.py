@@ -29,6 +29,7 @@ RESULTS_PATH = Path(__file__).resolve().parents[1] / "data" / "wc2026_results.js
 PROCESSED_DIR = Path(__file__).resolve().parents[1] / "data" / "processed"
 MODELS_DIR    = Path(__file__).resolve().parents[1] / "models"
 MANIFEST_PATH = MODELS_DIR / "model-manifest.json"
+TOTAL_FIXTURES = 104   # WC 2026 matches; the Tracker is final once all are scored
 
 WC_TEAMS = sorted({t for teams in GROUPS.values() for t in teams})
 
@@ -1419,8 +1420,8 @@ elif page == "Team Rankings":
 
 else:
     hero(HERO_TRACKER, "PREDICTION TRACKER",
-         "Model vs Reality &nbsp;·&nbsp; Live WC 2026 Results",
-         "How the model's pre-tournament predictions are holding up")
+         "WC 2026 Results &nbsp;·&nbsp; Final, 104 matches",
+         "How the model's pre-tournament predictions held up")
 
     @st.cache_data(ttl=3600, show_spinner=False)
     def load_tracked_results() -> tuple[dict | None, str | None]:
@@ -1457,9 +1458,11 @@ else:
     top_l, top_r = st.columns([4, 1])
     with top_l:
         st.markdown(
-            "Every match below was predicted **before the tournament began** — "
-            "the model has never seen a single WC 2026 result. Here's how its "
-            "calls compare to what actually happened."
+            "Every prediction comes from the model and team state **frozen "
+            "before the opening match on 11 June 2026**. The four forecasts "
+            "from the semi-finals onward were written to the prediction ledger "
+            "before kick-off; the other 100 were recomputed afterwards from the "
+            "same frozen state."
         )
     with top_r:
         if st.button("🔄 Refresh results"):
@@ -1511,13 +1514,20 @@ else:
     acc_delta = (acc - base_acc) * 100          # percentage points; +ve = good
     ll_gap    = model_ll - base_ll              # +ve = trailing (worse)
 
-    # Prominent small-sample caveat — these numbers are not final
+    # Status chip: final once every fixture is scored, a caveat before that.
+    if n >= TOTAL_FIXTURES:
+        chip_style = ("background:rgba(147,161,200,0.12);border:1px solid "
+                      "rgba(147,161,200,0.4);color:#b4bdd1")
+        chip_text = f"Final: all {n} matches scored"
+    else:
+        chip_style = ("background:rgba(245,158,11,0.12);border:1px solid "
+                      "rgba(245,158,11,0.4);color:#f0b54a")
+        chip_text = (f'⚠ Small sample: {n} match{"es" if n != 1 else ""} '
+                     f'so far, so expect these to swing')
     st.markdown(
-        f'<div style="display:inline-block;background:rgba(245,158,11,0.12);'
-        f'border:1px solid rgba(245,158,11,0.4);color:#f0b54a;border-radius:999px;'
+        f'<div style="display:inline-block;{chip_style};border-radius:999px;'
         f'padding:3px 13px;font-size:0.8rem;font-weight:600;margin-bottom:0.7rem">'
-        f'⚠ Small sample — through {n} match{"es" if n != 1 else ""}, '
-        f'expect these to swing</div>',
+        f'{chip_text}</div>',
         unsafe_allow_html=True,
     )
 
