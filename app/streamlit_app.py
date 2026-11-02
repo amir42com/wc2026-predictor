@@ -218,7 +218,7 @@ st.set_page_config(
         "Get help": "https://github.com/amir42com/wc2026-predictor",
         "Report a bug": "https://github.com/amir42com/wc2026-predictor/issues",
         "About": (
-            "**WC 2026 Predictor** — XGBoost + Elo-prior blend trained on "
+            "**WC 2026 Predictor**: XGBoost + Elo-prior blend trained on "
             "49,000+ international matches (1872–2026). "
             "Match predictions, Monte Carlo tournament simulation, and "
             "SHAP explainability."
@@ -350,7 +350,7 @@ h1, h2, h3 {
 .prob-cards > .prob-card { flex: 1; margin-bottom: 0; }
 .prob-strip {
     display: flex; height: 10px; margin-top: 8px;
-    border-radius: 5px; overflow: hidden;   /* symmetric pill — not tucked/clipped */
+    border-radius: 5px; overflow: hidden;   /* symmetric pill, not tucked or clipped */
 }
 .prob-strip > div { height: 100%; }
 @media (max-width: 768px) { .prob-cards { flex-direction: column; } }
@@ -378,7 +378,7 @@ h1, h2, h3 {
 }
 
 /* ── HTML tables (flag images need unescaped HTML) ── */
-/* Only the table scrolls sideways on narrow screens — never the page.
+/* Only the table scrolls sideways on narrow screens, never the page.
    max-width:100% keeps the wrapper inside its column; a thin styled
    scrollbar makes the horizontal scroll discoverable (Task 5). */
 .html-table {
@@ -483,7 +483,7 @@ h1, h2, h3 {
     overflow: visible;
 }
 
-/* Task 2 — mobile: all 4 destinations on one row, each a small icon ABOVE a
+/* Task 2, mobile: all 4 destinations on one row, each a small icon ABOVE a
    short label, evenly distributed with NO horizontal scroll. The real (long)
    label text is collapsed and the icon + short label are injected per position.
    ORDER-DEPENDENT: the nth-of-type list must match the st.radio options order
@@ -517,7 +517,7 @@ h1, h2, h3 {
     }
     /* icon (above) + short label (below). The Tabler SVG per position is
        injected as a content:url() image in a separate generated <style>
-       (see _nav_icon_css) — these rules set size + the short labels. */
+       (see _nav_icon_css); these rules set size + the short labels. */
     [data-testid="stMain"] [data-testid="stRadio"] [role="radiogroup"] > label::before {
         display: inline-block; width: 1.45rem; height: 1.45rem; line-height: 0;
     }
@@ -541,7 +541,7 @@ h1, h2, h3 {
 /* ── Match Predictor "vs" divider ──
    Desktop: padded down to sit beside the dropdowns (unchanged look). */
 .vs-divider { text-align: center; padding-top: 2rem; font-size: 1.5rem; color: #cdd6ee; }
-/* Mobile: columns stack, so the big top padding becomes dead space — compact
+/* Mobile: columns stack, so the big top padding becomes dead space, so compact
    it into a slim inline divider and tighten the gap between the stacked
    dropdowns. Scoped to the selector row via :has(.vs-divider). */
 @media (max-width: 768px) {
@@ -575,7 +575,7 @@ h1, h2, h3 {
 [data-testid="stTable"] td { border-color: #1d2547 !important; }
 [data-testid="stTable"] tbody tr:hover td { background: rgba(79,195,247,0.05); }
 
-/* hide element toolbars (fullscreen/download/search) — they break mobile touch */
+/* hide element toolbars (fullscreen/download/search): they break mobile touch */
 [data-testid="stElementToolbar"] { display: none !important; }
 
 /* ── sidebar credits ── */
@@ -743,8 +743,8 @@ with st.sidebar.expander("ℹ️ About the model"):
         "learned from **49,000+ international matches played since 1872**.\n\n"
         "For each fixture it weighs team strength, recent form, and "
         "head-to-head history to estimate win / draw / loss chances.\n\n"
-        "Those chances are blended with **Elo ratings** — a chess-style "
-        "strength score updated after every match — which keeps the "
+        "Those chances are blended with **Elo ratings** (a chess-style "
+        "strength score updated after every match), which keeps the "
         "probabilities realistic for tournament play.\n\n"
         "[Technical details on GitHub](https://github.com/amir42com/wc2026-predictor)"
     )
@@ -967,10 +967,10 @@ if page == "Match Predictor":
     # colour invariant as the result strip, scorelines and reasons panel.
     comp_metrics = [
         ("Elo rating",               f"{hs['elo']:.0f}",            f"{as_['elo']:.0f}"),
-        ("Form — win rate (last 5)", f"{hs['win_rate_5']*100:.0f}%", f"{as_['win_rate_5']*100:.0f}%"),
-        ("Form — avg GD (last 5)",   f"{hs['gd_5']:+.2f}",          f"{as_['gd_5']:+.2f}"),
-        ("Form — win rate (last 10)", f"{hs['win_rate_10']*100:.0f}%", f"{as_['win_rate_10']*100:.0f}%"),
-        ("Form — avg GD (last 10)",  f"{hs['gd_10']:+.2f}",         f"{as_['gd_10']:+.2f}"),
+        ("Form: win rate (last 5)", f"{hs['win_rate_5']*100:.0f}%", f"{as_['win_rate_5']*100:.0f}%"),
+        ("Form: avg GD (last 5)",   f"{hs['gd_5']:+.2f}",          f"{as_['gd_5']:+.2f}"),
+        ("Form: win rate (last 10)", f"{hs['win_rate_10']*100:.0f}%", f"{as_['win_rate_10']*100:.0f}%"),
+        ("Form: avg GD (last 10)",  f"{hs['gd_10']:+.2f}",         f"{as_['gd_10']:+.2f}"),
         ("Confederation",            hs["confederation"],           as_["confederation"]),
     ]
     cmp_head = (
@@ -1151,8 +1151,8 @@ elif page == "Tournament Simulator":
          "June 11 – July 19, 2026")
 
     st.markdown(
-        "This page plays out the **entire World Cup thousands of times** — "
-        "every group game, every knockout round — using the match predictor "
+        "This page plays out the **entire World Cup thousands of times** "
+        "(every group game, every knockout round), using the match predictor "
         "for each game. The more often a team lifts the trophy across those "
         "simulated tournaments, the higher its championship probability."
     )
@@ -1235,7 +1235,7 @@ elif page == "Tournament Simulator":
         st.markdown("---")
         st.subheader("How far does each team go?")
         st.caption(
-            "Share of simulations in which each team reached every stage — "
+            "Share of simulations in which each team reached every stage, "
             "from escaping the group (R32) to lifting the trophy. "
             "Darker cell = happens more often."
         )
@@ -1291,7 +1291,7 @@ elif page == "Tournament Simulator":
 
         st.caption(
             "How often each team escaped its group: **Top-2 qual %** = finished "
-            "1st or 2nd (guaranteed through). **3rd place %** = finished 3rd — "
+            "1st or 2nd (guaranteed through). **3rd place %** = finished 3rd; "
             "at WC 2026 the 8 best third-placed teams also advance."
         )
 
@@ -1325,7 +1325,7 @@ elif page == "Team Rankings":
 
     st.markdown(
         "**Elo** is a strength score (the same idea used in chess): every team "
-        "starts at 1500 and gains or loses points after each match — beating a "
+        "starts at 1500 and gains or loses points after each match. Beating a "
         "strong team earns more than beating a weak one. Top national teams "
         "score around 2000+."
     )
@@ -1377,7 +1377,7 @@ elif page == "Team Rankings":
 
     # ── WC 2026 teams table ────────────────────────────────────────────────
     st.markdown("---")
-    st.subheader("WC 2026 teams — Elo snapshot")
+    st.subheader("WC 2026 teams: Elo snapshot")
     st.caption(
         "All 48 qualified teams, organised by their group at the tournament. "
         "Higher Elo = stronger team going in."
@@ -1542,8 +1542,10 @@ else:
     s1, s2, s3 = st.columns(3)
     cards = [
         (s1, "#4fc3f7", "Matches tracked", f"{n}",
-         f'<span style="color:#5b6379;font-size:0.8rem">'
-         f'{payload.get("n_matches", n)} finished so far</span>'),
+         '<span style="color:#5b6379;font-size:0.8rem">'
+         + (f'all {n} played' if n >= TOTAL_FIXTURES else
+            f'{payload.get("n_matches", n)} finished so far')
+         + '</span>'),
         (s2, "#38bdf8", "Correct predictions", f"{acc*100:.0f}%",
          _chip(f"{acc_delta:+.0f} pp vs Elo", acc_delta >= 0)
          + f' <span style="color:#5b6379;font-size:0.78rem">{n_correct} of {n}</span>'),
@@ -1565,7 +1567,7 @@ else:
         "Card colours are neutral; the green/red **chips** carry the verdict "
         "versus the **Elo baseline** (the simple \"stronger team wins\" rule). "
         "**Log-loss** rewards confident correct calls and punishes confident "
-        "wrong ones — lower is better, so a negative gap means the model beats "
+        "wrong ones. Lower is better, so a negative gap means the model beats "
         "the baseline."
     )
 
@@ -1676,16 +1678,16 @@ else:
             for i, (hg, ag, pr) in enumerate(sl, start=1)
         )
         if hit_rank is not None:
-            verdict = (f'Actual <b>{hs}–{as_}</b> — the model\'s '
+            verdict = (f'Actual <b>{hs}–{as_}</b>, the model\'s '
                        f'<b>#{hit_rank}</b> scoreline at {sl[hit_rank-1][2]*100:.1f}%')
         else:
-            verdict = f'Actual <b>{hs}–{as_}</b> — outside the model\'s top 5'
+            verdict = f'Actual <b>{hs}–{as_}</b>, outside the model\'s top 5'
         return (
             f'<div class="trk-detail">'
             f'<div class="trk-dhead">Model\'s most likely scorelines (pre-match)'
             f'</div><div class="scl-panel">{items}</div>'
             f'<div class="trk-verdict">{verdict}</div>'
-            f'<div class="trk-note">For entertainment only — outcome probabilities '
+            f'<div class="trk-note">For entertainment only. Outcome probabilities '
             f'are far more reliable than exact scores, so a result outside the top 5 '
             f'(expected roughly half the time) is not the model failing.</div></div>'
         )
