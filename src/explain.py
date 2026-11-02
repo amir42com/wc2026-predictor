@@ -150,11 +150,12 @@ def _describe(group: str, shap_sum: float, fv: dict[str, float], ctx: dict) -> s
         n = fv["h2h_n"]
         if n <= 0:
             return f"Little head-to-head history; a slight edge to {edge}."
-        return f"Their head-to-head record over {n:.0f} past meetings leans to {edge}."
+        meetings = "past meeting" if round(n) == 1 else "past meetings"
+        return f"Their head-to-head record over {n:.0f} {meetings} leans to {edge}."
 
     if group == "Neutral venue":
-        return (f"Played at a neutral venue, so {home} gets no home advantage "
-                f"— a slight edge to {edge}.")
+        return (f"Played at a neutral venue, so {home} gets no home advantage, "
+                f"a slight edge to {edge}.")
 
     # Other factors (is_world_cup + residual, possibly folded H2H)
     return f"Small net edge to {edge} from minor factors."
