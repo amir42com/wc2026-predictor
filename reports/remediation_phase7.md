@@ -130,3 +130,153 @@ and M102 on 2026-07-13, M103 and M104 on 2026-07-16).
    ENT-306 merge.
 3. The ledger has no `kickoff_utc` values (date-level before-kickoff bound,
    as recorded in Phase 6). Unchanged by design.
+
+# ENT-306: reproducibility, serving state, MatchContext, figures, merge
+
+Recorded: 2026-11-02 (Sydney), branch `fix/scientific-audit` at 25e0e56.
+
+## Gate
+
+- HEAD 25e0e56 descends from base commit 38229c3: yes.
+- Suite at 25e0e56: 63 passed (rerun recorded in 7a/7b); smoke test passes.
+- Planned work is inside Preflight scope items 4 to 6 (pipeline rerun,
+  tests, website-style figures; MatchContext serving migration; merge into
+  master and push).
+- Gate for ENT-306: **PASS**, recorded before the first mutation.
+
+## A. Reproducibility check (served model never replaced)
+
+Frozen copies of `models/`, `data/raw/` and `data/processed/` were taken to
+the scratch folder first (sha256 list recorded), because none of the
+pipeline scripts can write elsewhere.
+
+- `src/fetch_data.py` (1 s): all three raw files already present, skipped,
+  so the rerun used the frozen snapshot (`results.csv` sha256 59f49de6...,
+  equal to `raw_results_sha256`).
+- `src/features.py`: 49,404 rows; `features.csv` sha256 cdbfc5a6... equal to
+  `features_csv_sha256`; `elo_ratings.csv` and `team_state.csv`
+  byte-identical to the frozen copies.
+- `src/train.py` (8 s): best iteration 175; rebuilt bundle sha256
+  52752a62...eb4d, equal to `bundle_sha256`.
+- Verdict: **frozen bundle reproducible from source** (on the frozen raw
+  snapshot). `train.py` rewrote `models/model-manifest.json` (only
+  `created_utc` and `code_git_sha` differed); it was restored from the
+  frozen copy and all eight frozen files re-verified against the recorded
+  sha256 list.
+- `backtest.py` (2m36s), `export_backtest.py` (2m36s), `paired_tests.py`
+  (2 s), `protocol_comparison.py` (34 s), `make_by_tournament.py` (3 s):
+  every report CSV byte-identical. The only change was
+  `reports/figures/figure5_by_tournament.png`, re-rendered as a side effect;
+  the committed PNG dated from 2026-07-11, before the Phase 4 remediation, so
+  the committed figures 3 to 6 carried pre-remediation numbers. Restored, then
+  replaced in D.
+- Suite after restoring: 63 passed (65 with the two serving-state tests of
+  B); smoke test all checks pass.
+
+**Finding: the deployed cold start did not serve the frozen bundle.**
+`app/streamlit_app.py` bootstrapped on Streamlit Community Cloud (where
+`data/` and `models/` were untracked) by downloading the current upstream
+`results.csv`, building features with its own loader (no canonical dedupe,
+unstable sort) and retraining. Replicating that path on the frozen raw
+snapshot in scratch gave 49,405 rows (the duplicated Gibraltar friendly
+kept), `features.csv` 1efda71e... and a bundle 1bed5d1c... with best
+iteration 150. On Cloud the upstream data also differs. So although training
+is reproducible from source, the deployed app served a different model from
+the one behind the ledger and the article, which is why B was done.
+
+## B. Serving-state integrity (commit ad1f109)
+
+- Tracked byte for byte: `models/xgb_wc2026.joblib` (1,577,761 B),
+  `data/processed/features.csv` (8,810,518 B), `elo_ratings.csv` (8,012 B),
+  `team_state.csv` (20,660 B); all far below 100 MB. `data/raw/` stays
+  ignored; `.gitignore` re-includes exactly these files.
+- The CSVs were written with CRLF and the manifest hashes those bytes, so
+  `.gitattributes` unsets `text` for them; the staged blob sha256 values were
+  checked equal to the manifest before commit (a Linux checkout would
+  otherwise get LF bytes and fail the hash check).
+- The cold-start retraining is removed. The app verifies the bundle and
+  `features.csv` against the manifest at start-up and stops with an
+  explanation if anything is missing or different; it never retrains.
+- Tests: frozen serving files match the manifest; no line-ending conversion.
+  Headless app run (Streamlit AppTest): loads in 14.6 s, no exception.
+
+## C. MatchContext serving migration (commit 5bb8051)
+
+- `Predictor.feature_X(home, away, neutral=1)` is the contract's
+  three-argument `build_x`; `Predictor.predict` calls `predict_match_proba`
+  with a neutral `MatchContext`; the new `Predictor.predict_ctx(ctx)` serves
+  both paths (neutral returns `predict`; host is one orientation with the
+  HFA-shifted prior).
+- Match Predictor page: a Venue choice (neutral, or the home team at home)
+  builds a `MatchContext`. Behaviour changes on the host path only: the old
+  hand-rolled path set `is_world_cup` to 0 and used an unshifted Elo prior;
+  it now follows the contract (`is_world_cup` 1, prior shifted by HFA 125.58).
+- The deprecated `predict_neutral_proba` shim had no remaining user and is
+  removed; its byte-equivalence test is replaced by tests on the real
+  serving state.
+- Byte identity: full-precision probabilities for all 104 cached fixtures
+  (the tracker path) and the four ledger rows recomputed with
+  `prediction_ledger`'s functions are identical before and after, and all
+  four ledger rows equal the ledger strings exactly. New tests pin two
+  neutral vectors, the host path and the four ledger rows.
+- App check: neutral Argentina v Spain 35.7 / 26.4 / 37.9 (equal to ledger
+  M104); Argentina at home 46.9 / 26.2 / 26.9; no exception.
+- Suite 67 passed; smoke test passes.
+
+## D. Website figures (commit e3d6cee) and residual fixes (commit 756377c)
+
+- Figures 3, 4, 5 and 6 regenerated from the remediated CSVs and figure 10
+  added (final live evaluation: all matches, 4 logged before kickoff, 100
+  recomputed; Blend and Elo accuracy and log-loss; Blend minus Elo log-loss
+  with the paired bootstrap interval). Each is written as
+  `<name>-light|dark.png|svg`, 1600 px wide, transparent, with the website
+  inks and the series colours of the website's `THEME_INK` (amir42-web
+  `scripts/editorial-art/figures.ts`) mapped to Raw XGBoost / Blend / Elo
+  baseline; figure 6 uses the same hues for outcomes with marker shapes and a
+  legend. Labels 48 px, notes 40 px, figures 44 px. The old dark-navy PNGs
+  are deleted. Titles and findings are left to the article captions.
+- Figure 5 is now a dot plot: the per-tournament differences are a few
+  thousandths, which bars could only show with a truncated baseline. Its old
+  subtitle ("a 2014 effect that reverses in 2018") no longer matched the
+  remediated numbers (the Blend also has the lower log-loss in 2022), and the
+  script's printed verdict is now derived from the data.
+- Rendering is deterministic (a second render left git clean). SVG text stays
+  text (`svg.fonttype none`).
+- `reports/live_evaluation.csv`: the `correct` column is an integer;
+  regenerated with `--final`, every value identical (only `68.0` to `68`).
+  EXC-1 in the Preflight JSON now says the files are excluded through
+  `.git/info/exclude`.
+
+## E. README (commit 669bde7) and merge
+
+The README carries the remediated backtest (Blend 53.13%, Elo 56.25%,
+log-loss 0.9818 vs 0.9859, McNemar p 0.21, bootstrap -0.004 [-0.025,
++0.018]), the per-tournament table, the final live evaluation (Blend 68/104,
+Elo 70/104, log-loss 0.8334 vs 0.8666, bootstrap -0.033 [-0.059, -0.005]),
+the frozen-serving note, and the blend weight 0.75 as a kept convention: the
+tune-fold search found its minimum at 1.0 and put 0.75 within about one
+bootstrap standard error of it (0.9118 vs 0.9071, standard error of the
+difference 0.0048).
+
+Merge into master: **held for explicit owner authorization.** Pushing master
+redeploys the public Streamlit app, which is a deployment step; DEC-166,
+ENT-6 and Update 40cb7da3... do not state it. The branch is pushed; nothing
+is merged.
+
+## ENT-306 residuals
+
+1. The website series palette fails the generic palette validator: light
+   green #4f8f6a below the chroma floor; the dark set outside the lightness
+   band, with dark blue and green below the normal-vision floor (14.9 < 15);
+   orange against green in the 6 to 8 colour-vision band. Kept unchanged for
+   consistency with the site's other figures and mitigated with hatches,
+   marker shapes, legends and direct labels. Revisit in the website figure
+   contract (amir42-web), not here.
+2. Inter is not installed locally, so the figures use DejaVu Sans (the agreed
+   fallback) and the SVGs name DejaVu Sans. Re-render if Inter is installed.
+3. `article/wc2026-predictor-article.md` (the old in-repo draft) still links
+   the deleted figure files and carries pre-remediation numbers. The
+   publication text lives in the CMS (ENT-307 onwards); decide there whether
+   to delete it or mark it superseded.
+4. Two pre-existing em dashes remain in untouched helper docstrings of
+   `src/make_figures.py` and one in a comment of `src/make_by_tournament.py`.
