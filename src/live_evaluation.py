@@ -12,13 +12,18 @@ after-extra-time W/D/L, with penalty shootouts scored as DRAWS (the martj42 /
 training-target convention; the tracker cache already strips shootout goals —
 validation re-checks that a PENALTY_SHOOTOUT record carries a level score).
 
-Metrics per system (Blend, Elo baseline): n, correct, accuracy, pooled
-log-loss, pooled Brier; McNemar exact + paired bootstrap (10,000 resamples,
-seed 12345) reusing paired_tests' implementations.
+Metrics per system (Blend, Elo baseline): n, correct, accuracy, log-loss,
+Brier; McNemar exact + paired bootstrap (10,000 resamples, seed 12345)
+reusing paired_tests' implementations. Metrics are reported pooled AND per
+tier (prospective, retrospective); the paired tests run only for a scope with
+at least MIN_PAIRED_N rows and are marked not applicable below that.
 
-FINAL MODE (--final) refuses unless there are EXACTLY 104 valid finished
-fixtures; only then is reports/live_evaluation.csv written. Anything less is
-an interim read-out printed to the terminal, never a report artifact.
+FINAL MODE (--final) refuses unless the evaluation is complete: EXACTLY 104
+valid finished fixtures, exactly 104 joined rows (one per valid fixture),
+zero validation problems and zero join problems. A refusal names the missing
+or unjoined fixture ids. Only a complete evaluation writes
+reports/live_evaluation.csv; anything less is an interim read-out printed to
+the terminal, never a report artifact.
 
 Usage:
     python src/live_evaluation.py            # interim read-out
@@ -45,6 +50,11 @@ OUT_PATH = ROOT / "reports" / "live_evaluation.csv"
 
 TOTAL_FIXTURES = 104
 SYSTEMS = ["blend", "elo"]
+SYSTEM_LABELS = [("blend", "Blend"), ("elo", "Elo baseline")]
+TIERS = ["prospective", "retrospective"]
+# Below this many rows a McNemar / bootstrap read-out is not informative
+# (the 4-row prospective tier); such a scope reports point metrics only.
+MIN_PAIRED_N = 30
 
 
 # ── result validation (pure, synthetic-testable) ────────────────────────────
@@ -141,62 +151,121 @@ def _truthy(v) -> bool:
     return str(v).strip().lower() in ("true", "1")
 
 
-def evaluate(rows: list[dict]) -> dict:
-    """Per-system metrics + paired tests over the joined rows."""
-    if not rows:
-        return {"n": 0}
+def _scope_metrics(rows: list[dict]) -> dict:
+    """Per-system metrics for one scope (pooled or a single tier), plus the
+    paired tests when the scope has at least MIN_PAIRED_N rows; below that
+    "mcnemar" and "bootstrap" are None (not applicable)."""
     y = np.array([r["y"] for r in rows])
+    idx = np.arange(len(y))
     out: dict = {"n": len(rows),
                  "n_prospective": sum(r["tier"] == "prospective" for r in rows),
                  "n_retrospective": sum(r["tier"] == "retrospective" for r in rows)}
-    proba = {s: np.vstack([r[s] for r in rows]) for s in SYSTEMS}
+    ll: dict[str, np.ndarray] = {}
+    correct: dict[str, np.ndarray] = {}
     for s in SYSTEMS:
-        p = proba[s] / proba[s].sum(axis=1, keepdims=True)
-        pred = p.argmax(axis=1)
-        p_true = p[np.arange(len(y)), y]
+        p = np.vstack([r[s] for r in rows])
+        p = p / p.sum(axis=1, keepdims=True)
         yb = np.zeros_like(p)
-        yb[np.arange(len(y)), y] = 1.0
+        yb[idx, y] = 1.0
+        correct[s] = p.argmax(axis=1) == y
+        ll[s] = -np.log(np.clip(p[idx, y], 1e-15, None))
         out[s] = {
-            "correct": int((pred == y).sum()),
-            "accuracy": float((pred == y).mean()),
-            "log_loss": float(-np.log(np.clip(p_true, 1e-15, None)).mean()),
+            "correct": int(correct[s].sum()),
+            "accuracy": float(correct[s].mean()),
+            "log_loss": float(ll[s].mean()),
             "brier": float(np.sum((p - yb) ** 2, axis=1).mean()),
         }
-    correct = {s: (proba[s].argmax(axis=1) == y) for s in SYSTEMS}
-    out["mcnemar"] = mcnemar_exact(correct["blend"], correct["elo"])
-    ll = {s: -np.log(np.clip(
-            (proba[s] / proba[s].sum(axis=1, keepdims=True))[np.arange(len(y)), y],
-            1e-15, None)) for s in SYSTEMS}
-    out["bootstrap"] = bootstrap_logloss_ci(ll["blend"] - ll["elo"])
+    if len(rows) >= MIN_PAIRED_N:
+        out["mcnemar"] = mcnemar_exact(correct["blend"], correct["elo"])
+        out["bootstrap"] = bootstrap_logloss_ci(ll["blend"] - ll["elo"])
+    else:
+        out["mcnemar"] = out["bootstrap"] = None
     return out
 
 
-def final_mode_check(valid_results: dict[str, dict]) -> None:
-    """FINAL mode gate: exactly TOTAL_FIXTURES valid finished fixtures."""
-    n = len(valid_results)
-    if n != TOTAL_FIXTURES:
+def evaluate(rows: list[dict]) -> dict:
+    """Pooled per-system metrics + paired tests over the joined rows, and the
+    same metrics for each tier that has rows under "tiers"."""
+    if not rows:
+        return {"n": 0, "tiers": {}}
+    out = _scope_metrics(rows)
+    out["tiers"] = {t: _scope_metrics([r for r in rows if r["tier"] == t])
+                    for t in TIERS if any(r["tier"] == t for r in rows)}
+    return out
+
+
+def final_mode_check(valid_results: dict[str, dict], rows: list[dict],
+                     validation_problems: list[str], join_problems: list[str],
+                     record_ids: list[str] | None = None) -> None:
+    """FINAL mode gate: the evaluation must be complete. Requires exactly
+    TOTAL_FIXTURES valid finished fixtures, exactly TOTAL_FIXTURES joined
+    rows covering those fixtures once each, and no validation or join
+    problems. record_ids (every fixture_id seen in the raw results) lets a
+    refusal name fixtures that were present but not valid."""
+    reasons: list[str] = []
+    n_valid = len(valid_results)
+    if n_valid != TOTAL_FIXTURES:
+        reasons.append(f"{n_valid} valid finished fixtures, need exactly "
+                       f"{TOTAL_FIXTURES}")
+    missing = sorted({i for i in (record_ids or []) if i} - set(valid_results))
+    if missing:
+        reasons.append(f"not valid/finished: {', '.join(missing)}")
+    joined_ids = [r["fixture_id"] for r in rows]
+    if len(joined_ids) != TOTAL_FIXTURES:
+        reasons.append(f"{len(joined_ids)} joined rows, need exactly "
+                       f"{TOTAL_FIXTURES}")
+    unjoined = sorted(set(valid_results) - set(joined_ids))
+    if unjoined:
+        reasons.append(f"unjoined: {', '.join(unjoined)}")
+    dup = sorted({i for i in joined_ids if joined_ids.count(i) > 1})
+    if dup:
+        reasons.append(f"joined more than once: {', '.join(dup)}")
+    if validation_problems:
+        reasons.append(f"{len(validation_problems)} validation problem(s): "
+                       + "; ".join(validation_problems))
+    if join_problems:
+        reasons.append(f"{len(join_problems)} join problem(s): "
+                       + "; ".join(join_problems))
+    if reasons:
         raise RuntimeError(
-            f"final mode refused: {n} valid finished fixtures, need exactly "
-            f"{TOTAL_FIXTURES}. reports/live_evaluation.csv is only written "
-            "for the complete tournament.")
+            "final mode refused: " + " | ".join(reasons)
+            + ". reports/live_evaluation.csv is only written for the complete "
+              "tournament.")
 
 
-def write_final_report(rows: list[dict], metrics: dict, path: Path = OUT_PATH) -> None:
-    recs = []
-    for s, label in [("blend", "Blend"), ("elo", "Elo baseline")]:
-        m = metrics[s]
-        recs.append({"system": label, "n": metrics["n"],
-                     "n_prospective": metrics["n_prospective"],
-                     "n_retrospective": metrics["n_retrospective"], **m})
-    mc, bs = metrics["mcnemar"], metrics["bootstrap"]
-    recs.append({"system": "McNemar exact (Blend vs Elo)", "n": metrics["n"],
+def _report_block(scope: str, m: dict) -> list[dict]:
+    """CSV records for one scope: one per system, then the paired tests (or a
+    not-applicable marker when the scope is too small)."""
+    base = {"scope": scope, "n": m["n"], "n_prospective": m["n_prospective"],
+            "n_retrospective": m["n_retrospective"]}
+    recs = [{**base, "system": label, **m[s]} for s, label in SYSTEM_LABELS]
+    mc, bs = m["mcnemar"], m["bootstrap"]
+    if mc is None:
+        na = f"not applicable (n={m['n']} < {MIN_PAIRED_N})"
+        recs.append({**base, "system": "McNemar exact (Blend vs Elo)", "detail": na})
+        recs.append({**base, "system": "Bootstrap logloss diff (Blend-Elo)",
+                     "detail": na})
+        return recs
+    recs.append({**base, "system": "McNemar exact (Blend vs Elo)",
                  "p_value": mc["p_value"],
                  "detail": f"b={mc['b']}, c={mc['c']}, discordant={mc['n_discordant']}"})
-    recs.append({"system": "Bootstrap logloss diff (Blend-Elo)", "n": metrics["n"],
+    recs.append({**base, "system": "Bootstrap logloss diff (Blend-Elo)",
                  "mean_diff": bs["mean_diff"],
                  "detail": f"95% CI [{bs['ci_low']:.6f}, {bs['ci_high']:.6f}], "
                            f"{bs['n_boot']} resamples, seed {bs['seed']}"})
-    pd.DataFrame(recs).to_csv(path, index=False)
+    return recs
+
+
+def write_final_report(rows: list[dict], metrics: dict, path: Path = OUT_PATH) -> None:
+    """Pooled block first, then one block per tier that has rows."""
+    recs = _report_block("pooled", metrics)
+    for t in TIERS:
+        if t in metrics["tiers"]:
+            recs += _report_block(t, metrics["tiers"][t])
+    cols = ["scope", "system", "n", "n_prospective", "n_retrospective",
+            "correct", "accuracy", "log_loss", "brier", "p_value", "mean_diff",
+            "detail"]
+    pd.DataFrame(recs, columns=cols).to_csv(path, index=False)
     print(f"wrote {path}")
 
 
@@ -273,7 +342,8 @@ def main() -> None:
                              f"{TOTAL_FIXTURES} valid finished fixtures required)")
     args = parser.parse_args()
 
-    valid, problems = validate_results(load_results_from_cache())
+    records = load_results_from_cache()
+    valid, problems = validate_results(records)
     for p in problems:
         print(f"PROBLEM: {p}")
 
@@ -292,19 +362,31 @@ def main() -> None:
     print(f"\nEvaluated {metrics['n']} fixtures "
           f"({metrics['n_prospective']} prospective / "
           f"{metrics['n_retrospective']} retrospective)")
-    for s, label in [("blend", "Blend"), ("elo", "Elo baseline")]:
-        m = metrics[s]
-        print(f"  {label:<13} {m['correct']}/{metrics['n']} correct  "
-              f"acc {m['accuracy']*100:.2f}%  ll {m['log_loss']:.4f}  "
-              f"brier {m['brier']:.4f}")
-    mc, bs = metrics["mcnemar"], metrics["bootstrap"]
+    _print_scope("pooled", metrics)
+    for t in TIERS:
+        if t in metrics["tiers"]:
+            _print_scope(t, metrics["tiers"][t])
+
+    if args.final:
+        final_mode_check(valid, rows, problems, join_problems,
+                         record_ids=[r.get("fixture_id") for r in records])
+        write_final_report(rows, metrics)
+
+
+def _print_scope(scope: str, m: dict) -> None:
+    print(f"[{scope}] n={m['n']}")
+    for s, label in SYSTEM_LABELS:
+        ms = m[s]
+        print(f"  {label:<13} {ms['correct']}/{m['n']} correct  "
+              f"acc {ms['accuracy']*100:.2f}%  ll {ms['log_loss']:.4f}  "
+              f"brier {ms['brier']:.4f}")
+    mc, bs = m["mcnemar"], m["bootstrap"]
+    if mc is None:
+        print(f"  paired tests not applicable (n={m['n']} < {MIN_PAIRED_N})")
+        return
     print(f"  McNemar p={mc['p_value']:.4f} (b={mc['b']}, c={mc['c']}); "
           f"bootstrap LL diff {bs['mean_diff']:+.4f} "
           f"[{bs['ci_low']:+.4f}, {bs['ci_high']:+.4f}]")
-
-    if args.final:
-        final_mode_check(valid)
-        write_final_report(rows, metrics)
 
 
 if __name__ == "__main__":
