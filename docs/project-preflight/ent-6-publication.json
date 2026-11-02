@@ -1,0 +1,32 @@
+{
+  "schema": "project-preflight/draft-1",
+  "protocol": { "version": "v1", "revision": "v1.26" },
+  "project": "World Cup 2026 Predictor & Article",
+  "personalOsProject": "3c2b7da33f50813295e3fe6b447455dd",
+  "workUnit": "ENT-6 publication; child Tasks ENT-305 to ENT-309",
+  "baseCommit": "38229c3f67999a946b644e8131a8495527e1c0e3",
+  "branch": "fix/scientific-audit",
+  "fullPreflightTrigger": "repository materially resumed after a pause (last commit 2026-07-16, reactivated 2026-11-02)",
+  "scope": [
+    "verify and correct the final-mode completeness and per-tier reporting of src/live_evaluation.py",
+    "refresh data/wc2026_results.json from football-data.org and verify the third-place and final results against official sources",
+    "run the 104-fixture final live evaluation and commit reports/live_evaluation.csv",
+    "rerun the pipeline and tests, regenerate figures from the remediated reports in the website style",
+    "finish the MatchContext serving migration",
+    "merge fix/scientific-audit into master and push",
+    "publication text lives in the amir42-web CMS, not in this repository"
+  ],
+  "outOfScope": [
+    "any change to the model, features, blend weight or evaluation protocol beyond the completeness fixes",
+    "any edit to reports/prediction_ledger.csv",
+    "new hosting, subdomain or deployment target for the Streamlit app"
+  ],
+  "capabilities": ["python data pipeline", "Streamlit app on Community Cloud", "public article"],
+  "baseline": "no dev-standards bundle consumed by this repository; Personal OS Protocol v1.26 and DEC-151 public repository identity rule apply",
+  "riskTier": "T2",
+  "riskInputs": { "trustBoundaryChange": false, "publishedArtifactChange": true, "dataLossRisk": false, "rollbackCost": "low (branch work, revertible commits)" },
+  "exceptions": [ { "id": "EXC-1", "what": "AGENTS.md and CLAUDE.md exist locally but are gitignored, while Protocol v1.25 expects them tracked", "reason": "pre-existing state; adoption follows the DEC-151 order through normal authorized work", "revisit": "when ENT-306 merges fix/scientific-audit into master" } ],
+  "invalidators": [ "HEAD no longer descends from baseCommit", "scope expands beyond the list above", "Protocol revision changes Preflight or Gate semantics for this class of work" ],
+  "authorization": "owner approval 2026-11-02 in the project thread; Personal OS Update 40cb7da33f5081c69251db70bb35280b; DEC-166",
+  "gateEvidence": "recorded after evaluation in reports/remediation_phase7.md"
+}
