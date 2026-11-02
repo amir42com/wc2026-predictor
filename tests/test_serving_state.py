@@ -66,6 +66,43 @@ def test_predictor_serves_post_final_match_state():
         assert p._state["Alpha"]["win_rate_5"] == 0.8, p._state["Alpha"]
 
 
+ROOT = Path(__file__).resolve().parents[1]
+SERVING_FILES = ["models/xgb_wc2026.joblib", "data/processed/features.csv",
+                 "data/processed/elo_ratings.csv", "data/processed/team_state.csv"]
+
+
+def test_frozen_serving_state_matches_manifest():
+    """The tracked serving files are the frozen ones the manifest records, so
+    the deployed app (which refuses to serve otherwise) loads the exact bundle
+    that produced the prediction ledger."""
+    import hashlib
+    import json
+
+    for rel in SERVING_FILES:
+        assert (ROOT / rel).exists(), f"missing serving file {rel}"
+    manifest = json.loads((ROOT / "models" / "model-manifest.json")
+                          .read_text(encoding="utf-8"))
+    for rel, key in (("models/xgb_wc2026.joblib", "bundle_sha256"),
+                     ("data/processed/features.csv", "features_csv_sha256")):
+        got = hashlib.sha256((ROOT / rel).read_bytes()).hexdigest()
+        assert got == manifest[key], f"{rel}: {got} != manifest {key}"
+
+
+def test_serving_files_have_no_line_ending_conversion():
+    """The manifest hashes the CSVs byte for byte (written with CRLF), so git
+    must never convert their line endings on a Linux checkout (Streamlit
+    Community Cloud); .gitattributes unsets `text` for them."""
+    import shutil
+    import subprocess
+
+    if shutil.which("git") is None:
+        return
+    out = subprocess.run(["git", "check-attr", "text", "--", *SERVING_FILES],
+                         cwd=ROOT, capture_output=True, text=True, check=True).stdout
+    for line in out.strip().splitlines():
+        assert line.endswith(": text: unset"), line
+
+
 def main() -> int:
     tests = sorted((n, f) for n, f in globals().items()
                    if n.startswith("test_") and callable(f))

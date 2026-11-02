@@ -23,6 +23,7 @@ Usage:
 """
 
 import argparse
+from dataclasses import dataclass
 from pathlib import Path
 
 import joblib
@@ -68,16 +69,54 @@ LABEL_MAP = {0: "Home win", 1: "Draw", 2: "Away win"}
 WC_BACKTEST_YEARS = [2014, 2018, 2022]
 
 # Production ensemble: blend XGB probabilities with an Elo-logistic prior.
-# Honest finding from the canonical 192-match backtest (see
-# reports/backtest_metrics_summary.csv): the blend IMPROVES on raw XGB
-# (log-loss/Brier) and posts numerically lower pooled log-loss (0.9720 vs
-# 0.9769) and Brier (0.5735 vs 0.5770) than the naive Elo baseline, but Elo
-# is more accurate (57.8% vs 56.25%) and the gap is within noise (McNemar
-# p≈0.58, bootstrap log-loss CI straddles 0). The blend ships for its better
-# probabilistic scores over raw XGB, not as a claimed win over Elo. Weight
-# tuned on WC 2006/2010 only.
+# Honest finding from the pre-remediation 192-match backtest (baseline values
+# preserved in reports/remediation_baseline.md; Phase 4 re-derives them under
+# the corrected protocol): the blend improved on raw XGB (log-loss/Brier) and
+# posted numerically lower pooled log-loss than the naive Elo baseline, but
+# Elo was more accurate and the gap was within noise. The blend ships for its
+# better probabilistic scores over raw XGB, not as a claimed win over Elo.
+# Weight tuned on WC 2006/2010 only. Remediation Phase 3 re-ran that selection
+# under the corrected frozen-state protocol (reports/blend_weight_search.csv):
+# tune-fold argmin was w=1.00, but the whole curve spans less than one
+# bootstrap SE of the minimum (delta at 0.75: 0.0048 vs SE 0.0425), so the
+# pre-registered rule keeps 0.75 — corroborated, not re-tuned.
 ELO_BLEND_W   = 0.75   # XGB share of the blend
 ELO_DRAW_RATE = 0.227  # historical draw share used by the prior
+
+# Venue contract (remediation Phase 2): the pipeline's Elo is venue-blind, so
+# when a match is NOT neutral the Elo-logistic prior receives a fixed
+# home-advantage offset. Fitted ONCE (2026-07-13) by maximum likelihood under
+# the production link on the FULL non-neutral canonical pre-cutoff history
+# (fit_hfa_elo below: 36,346 rows; the prior's fixed draw share makes draws
+# uninformative for the offset, so 28,038 decided matches enter). A sensitivity
+# study (table in reports/remediation_phase2.md) put every era window
+# (full/>=1990/>=2000/>=2010), match type (all/competitive/friendly) and a
+# draw-inclusive Davidson link in the 107-138 range; the decision-rule window
+# (post-1990 competitive, 128.32) corroborates the full-history fit, and the
+# rejected deployment-domain alternative — post-2010 competitive, 113.33 —
+# would move blended probabilities by only ~0.35pp. HFA declines monotonically
+# across eras (competitive: 138 -> 113), so read Phase 4's mandatory per-fold
+# refit sensitivity line in that context. Like ELO_DRAW_RATE this is a frozen
+# production constant with recorded provenance, NOT tuned against any
+# published metric; tests/test_match_context.py re-runs the fit recipe.
+HFA_ELO = 125.58  # full-history MLE, production link (canonical features.csv)
+
+
+@dataclass(frozen=True)
+class MatchContext:
+    """
+    Explicit venue/inference context for one fixture (remediation Phase 2).
+
+    Invariant (upstream martj42 semantics, verified on all non-neutral WC
+    rows): when `neutral` is False, `home_team` IS the side receiving home
+    advantage. `venue_country` is evidence for deriving `neutral` (and for
+    audit); it is never fed to the model.
+    """
+    home_team: str
+    away_team: str
+    neutral: bool
+    venue_country: "str | None" = None
+    is_world_cup: bool = True
 
 
 def elo_prior_proba(elo_home: float, elo_away: float,
@@ -88,31 +127,73 @@ def elo_prior_proba(elo_home: float, elo_away: float,
     return p / p.sum()
 
 
-def predict_neutral_proba(model, build_x, team_a: str, team_b: str,
-                          elo_a: float, elo_b: float,
-                          blend_weight: float = ELO_BLEND_W,
-                          draw_rate: float = ELO_DRAW_RATE) -> np.ndarray:
+def fit_hfa_elo(features_df: pd.DataFrame) -> float:
     """
-    THE single deployed neutral-venue inference, shared by the Streamlit
-    predictor, the tracker, the simulator and the backtest so all evaluate the
-    exact same procedure.
+    Maximum-likelihood home-advantage offset (in Elo points) for the prior.
 
-    `build_x(home, away)` is supplied by the caller and returns a single-row
-    feature matrix aligned to the model's feature columns (the caller owns X
-    construction — team-state reconstruction for serving, recorded-row
-    re-orientation for the backtest). The steps:
+    Recipe (deterministic, canonical data only): take every non-neutral row of
+    the canonical features.csv (pre-cutoff by construction), model the home
+    side's win probability among decided matches as the Elo expectation with
+    the home rating shifted by `h`, and maximize the log-likelihood over h in
+    [0, 400]. Under the elo_prior_proba form the draw share is a constant
+    factor independent of h, so drawn matches contribute nothing to the
+    gradient and only home wins / away wins enter.
+    """
+    from scipy.optimize import minimize_scalar
 
-      1. predict_proba for A-vs-B and B-vs-A,
-      2. reverse the second vector ([2,1,0]) back to A's perspective,
+    nn = features_df[features_df["neutral"] == 0]
+    diff = nn["elo_diff"].to_numpy(dtype=float)
+    home_win = (nn["outcome"] == 0).to_numpy()
+    away_win = (nn["outcome"] == 2).to_numpy()
+
+    def neg_ll(h: float) -> float:
+        e = 1.0 / (1.0 + 10.0 ** (-(diff + h) / 400.0))
+        return -(np.log(e[home_win]).sum() + np.log(1.0 - e[away_win]).sum())
+
+    res = minimize_scalar(neg_ll, bounds=(0.0, 400.0), method="bounded",
+                          options={"xatol": 1e-6})
+    return float(res.x)
+
+
+def predict_match_proba(model, build_x, ctx: MatchContext,
+                        elo_home: float, elo_away: float,
+                        blend_weight: float = ELO_BLEND_W,
+                        draw_rate: float = ELO_DRAW_RATE,
+                        hfa_elo: "float | None" = None) -> np.ndarray:
+    """
+    THE single deployed inference, shared by the Streamlit predictor, the
+    tracker, the simulator and the backtest so all evaluate the exact same
+    procedure. The venue treatment is governed entirely by `ctx` (MatchContext).
+
+    `build_x(home, away, neutral)` is supplied by the caller and returns a
+    single-row feature matrix aligned to the model's feature columns (the
+    caller owns X construction — team-state reconstruction for serving,
+    recorded-row re-orientation for the backtest).
+
+    Neutral fixture (ctx.neutral=True — orientation is bookkeeping):
+      1. predict_proba for home-vs-away and away-vs-home, both with neutral=1,
+      2. reverse the second vector ([2,1,0]) back to home's perspective,
       3. average the two (cancels the model's residual home/away asymmetry),
-      4. shrink toward the Elo-logistic prior at `blend_weight`.
+      4. shrink toward the symmetric Elo-logistic prior at `blend_weight`.
 
-    Returns P(team_a win, draw, team_b win), summing to 1.
+    Non-neutral fixture (ctx.home_team has real home advantage):
+      1. a SINGLE orientation — ctx.home_team in the home slot, neutral=0
+         (symmetry-averaging would erase exactly the advantage being modelled),
+      2. shrink toward the Elo-logistic prior with the home rating shifted by
+         `hfa_elo` (default: the frozen production constant HFA_ELO).
+
+    `elo_home`/`elo_away` follow ctx.home_team/ctx.away_team. Returns
+    P(home win, draw, away win), summing to 1.
     """
-    p_ab = model.predict_proba(build_x(team_a, team_b))[0]
-    p_ba = model.predict_proba(build_x(team_b, team_a))[0]
-    p_model = (p_ab + p_ba[[2, 1, 0]]) / 2.0
-    prior = elo_prior_proba(elo_a, elo_b, draw_rate)
+    if ctx.neutral:
+        p_ab = model.predict_proba(build_x(ctx.home_team, ctx.away_team, 1))[0]
+        p_ba = model.predict_proba(build_x(ctx.away_team, ctx.home_team, 1))[0]
+        p_model = (p_ab + p_ba[[2, 1, 0]]) / 2.0
+        prior = elo_prior_proba(elo_home, elo_away, draw_rate)
+    else:
+        h = HFA_ELO if hfa_elo is None else hfa_elo
+        p_model = model.predict_proba(build_x(ctx.home_team, ctx.away_team, 0))[0]
+        prior = elo_prior_proba(elo_home + h, elo_away, draw_rate)
     blended = blend_weight * p_model + (1.0 - blend_weight) * prior
     return blended / blended.sum()
 
@@ -288,10 +369,67 @@ def _print_backtest_table(df: pd.DataFrame) -> None:
     print(sep)
 
 
+def _dixon_coles_rho() -> float:
+    """Scoreline-layer constant, imported lazily (scorelines pulls scipy)."""
+    from scorelines import DIXON_COLES_RHO
+    return DIXON_COLES_RHO
+
+
+def write_manifest(bundle_path: Path, model, feature_cols: list[str],
+                   n_train_rows: int) -> Path:
+    """
+    Provenance manifest for the shipped bundle (remediation Phase 3 closes the
+    audit's "no provenance manifest" gap): hashes of the bundle and its exact
+    training input, plus every frozen production constant the deployed
+    inference uses. models/ is gitignored; the manifest is force-tracked.
+    """
+    import hashlib
+    import json
+    import subprocess
+    from datetime import datetime, timezone
+
+    import xgboost
+
+    def _sha256(p: Path) -> str:
+        return hashlib.sha256(p.read_bytes()).hexdigest()
+
+    try:
+        git_sha = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=bundle_path.parents[1],
+            capture_output=True, text=True).stdout.strip() or None
+    except Exception:
+        git_sha = None
+
+    manifest = {
+        "created_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "code_git_sha": git_sha,
+        "bundle_file": bundle_path.name,
+        "bundle_sha256": _sha256(bundle_path),
+        "training_rows": n_train_rows,
+        "features_csv_sha256": _sha256(PROCESSED_DIR / "features.csv"),
+        "raw_results_sha256": _sha256(
+            PROCESSED_DIR.parent / "raw" / "results.csv"),
+        "elo_blend_w": ELO_BLEND_W,
+        "elo_draw_rate": ELO_DRAW_RATE,
+        "hfa_elo": HFA_ELO,
+        "dixon_coles_rho": _dixon_coles_rho(),
+        "best_iteration": int(model.best_iteration),
+        "n_features": len(feature_cols),
+        "xgboost_version": xgboost.__version__,
+        "blend_weight_search": "reports/blend_weight_search.csv",
+    }
+    out = bundle_path.parent / "model-manifest.json"
+    out.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    return out
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--backtest", action="store_true",
                         help="Run WC walk-forward backtest (trains 4 extra models, ~2 min)")
+    parser.add_argument("--production-only", action="store_true",
+                        help="Train and save ONLY the shipped bundle (skips the "
+                             "pre-2018 eval model and its 2018+ read-out)")
     args = parser.parse_args()
 
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
@@ -300,17 +438,18 @@ def main() -> None:
     df = pd.read_csv(PROCESSED_DIR / "features.csv", parse_dates=["date"])
     print(f"  {len(df):,} rows total")
 
-    mask = df["date"].dt.year < TEST_YEAR
-    df_train, df_test = df[mask].reset_index(drop=True), df[~mask].reset_index(drop=True)
-    print(f"  Train: {len(df_train):,} matches (before {TEST_YEAR})")
-    print(f"  Test:  {len(df_test):,} matches  ({TEST_YEAR}+)\n")
+    if not args.production_only:
+        mask = df["date"].dt.year < TEST_YEAR
+        df_train, df_test = df[mask].reset_index(drop=True), df[~mask].reset_index(drop=True)
+        print(f"  Train: {len(df_train):,} matches (before {TEST_YEAR})")
+        print(f"  Test:  {len(df_test):,} matches  ({TEST_YEAR}+)\n")
 
-    print("Training evaluation model (pre-2018 only) ...")
-    eval_model, feature_cols = train_model(df_train)
-    print(f"  {len(feature_cols)} input features\n")
+        print("Training evaluation model (pre-2018 only) ...")
+        eval_model, feature_cols = train_model(df_train)
+        print(f"  {len(feature_cols)} input features\n")
 
-    print(f"Evaluation on held-out test set ({TEST_YEAR}+):")
-    evaluate(eval_model, df_test, feature_cols)
+        print(f"Evaluation on held-out test set ({TEST_YEAR}+):")
+        evaluate(eval_model, df_test, feature_cols)
 
     # Shipped model: retrain on ALL pre-tournament data so the deployed
     # predictor has seen 2018–2026, not just the pre-2018 eval slice.
@@ -326,6 +465,9 @@ def main() -> None:
 
     size_mb = out.stat().st_size / 1e6
     print(f"\nModel saved -> {out}  ({size_mb:.1f} MB)")
+
+    manifest_path = write_manifest(out, model, feature_cols, len(df_prod))
+    print(f"Manifest    -> {manifest_path}")
 
     print("\nTop 15 features by importance (shipped model):")
     imp = pd.Series(model.feature_importances_, index=feature_cols).nlargest(15)

@@ -32,8 +32,11 @@ import numpy as np
 from scipy.optimize import minimize
 from scipy.stats import poisson
 
-# Fitted once by MLE on historical scorelines (see fit_rho_from_data()): ~-0.05,
-# a mild low-score dependence typical of football. Only shapes the four lowest
+# Fitted once by MLE on the CANONICAL pre-cutoff scorelines (remediation
+# Phase 5; recipe in fit_rho_from_data, artifact reports/scoreline_rho_fit.csv,
+# refit by tests/test_simulator.py): fitted value -0.050006 on 49,404 matches
+# — the frozen -0.05 is the fit after rounding, not a convention. A mild
+# low-score dependence typical of football. Only shapes the four lowest
 # cells; does NOT affect W/D/L consistency (enforced by the lambda solve).
 DIXON_COLES_RHO = -0.05
 MAX_GOALS = 10          # grid covers 0..10 goals per side; tail beyond is tiny
@@ -126,27 +129,48 @@ def top_scorelines(p_home: float, p_draw: float, p_away: float,
 
 # ── offline calibration of rho (not called at runtime) ──────────────────────
 
-def fit_rho_from_data(results_csv: str = "data/raw/results.csv",
-                      features_csv: str = "data/processed/features.csv") -> float:
+def fit_rho_from_data(write_report: bool = False) -> float:
     """
-    Estimate the Dixon-Coles rho by max-likelihood on historical scorelines.
+    Estimate the Dixon-Coles rho by max-likelihood on CANONICAL pre-cutoff
+    scorelines (remediation Phase 5 recipe — deterministic, documented,
+    re-run by tests/test_simulator.py).
 
-    Per-match expected goals are taken from two simple Poisson regressions of
-    goals on the Elo gap (and a home-advantage term for non-neutral matches),
-    then rho is chosen to maximise the DC tau likelihood on the four low-score
-    cells. Run once; the result is hard-coded as DIXON_COLES_RHO above.
+    Data: features.py's canonical loader with the published training cutoff;
+    scores come from the canonical rows and elo_diff/neutral from the
+    canonical features.csv, aligned 1:1 positionally (features.csv is built
+    from exactly these rows in canonical sort order — asserted below). The
+    old recipe merged the raw file by (date, home, away) key, which
+    cross-joined the kept Tahiti double-header and read pre-dedupe data.
+
+    Model: per-match expected goals from two Poisson regressions of goals on
+    the Elo gap (plus a home-advantage term for non-neutral matches); rho then
+    maximises the DC tau likelihood on the four low-score cells (the only
+    cells it touches). With write_report=True the fit is recorded to
+    reports/scoreline_rho_fit.csv.
     """
+    import sys
+    from pathlib import Path
+
     import pandas as pd
-    from sklearn.linear_model import PoissonRegressor
     from scipy.optimize import minimize_scalar
+    from sklearn.linear_model import PoissonRegressor
 
-    res = pd.read_csv(results_csv).dropna(subset=["home_score", "away_score"])
-    feat = pd.read_csv(features_csv)[["date", "home_team", "away_team", "elo_diff"]]
-    df = res.merge(feat, on=["date", "home_team", "away_team"], how="inner")
-    hs = np.clip(df["home_score"].to_numpy(float), 0, 8)
-    as_ = np.clip(df["away_score"].to_numpy(float), 0, 8)
-    home_adv = (1 - df["neutral"].astype(int)).to_numpy(float)
-    ed = df["elo_diff"].to_numpy(float) / 400.0
+    src = Path(__file__).resolve().parent
+    sys.path.insert(0, str(src))
+    from features import load_canonical_results
+
+    root = src.parent
+    canonical = load_canonical_results(cutoff=pd.Timestamp("2026-06-11"))
+    feat = pd.read_csv(root / "data" / "processed" / "features.csv",
+                       parse_dates=["date"])
+    assert len(canonical) == len(feat), "canonical/features row mismatch"
+    assert (canonical["home_team"].values == feat["home_team"].values).all()
+    assert (canonical["date"].values == feat["date"].values).all()
+
+    hs = np.clip(canonical["home_score"].to_numpy(float), 0, 8)
+    as_ = np.clip(canonical["away_score"].to_numpy(float), 0, 8)
+    home_adv = (1 - feat["neutral"].astype(int)).to_numpy(float)
+    ed = feat["elo_diff"].to_numpy(float) / 400.0
 
     reg_h = PoissonRegressor(alpha=1e-4, max_iter=400).fit(
         np.column_stack([ed, home_adv]), hs)
@@ -170,10 +194,43 @@ def fit_rho_from_data(results_csv: str = "data/raw/results.csv",
         ll += np.log(np.clip(1 - rho, eps, None)) * int(m11.sum())
         return -ll
 
-    out = minimize_scalar(neg_ll, bounds=(-0.3, 0.1), method="bounded")
-    return float(out.x)
+    out = minimize_scalar(neg_ll, bounds=(-0.3, 0.1), method="bounded",
+                          options={"xatol": 1e-8})
+    rho = float(out.x)
+
+    if write_report:
+        import hashlib
+        from datetime import date
+
+        feat_hash = hashlib.sha256(
+            (root / "data" / "processed" / "features.csv").read_bytes()).hexdigest()
+        rows = pd.DataFrame([{
+            "fitted_rho": rho,
+            "frozen_constant": DIXON_COLES_RHO,
+            "n_matches": len(canonical),
+            "n_00": int(m00.sum()), "n_01": int(m01.sum()),
+            "n_10": int(m10.sum()), "n_11": int(m11.sum()),
+            "reg_home_coef_elo": float(reg_h.coef_[0]),
+            "reg_home_coef_hadv": float(reg_h.coef_[1]),
+            "reg_home_intercept": float(reg_h.intercept_),
+            "reg_away_coef_elo": float(reg_a.coef_[0]),
+            "reg_away_intercept": float(reg_a.intercept_),
+        }])
+        out_csv = root / "reports" / "scoreline_rho_fit.csv"
+        header = ("# Dixon-Coles rho fit on canonical pre-cutoff data "
+                  "(remediation Phase 5).\n"
+                  f"# date={date.today().isoformat()}  "
+                  f"canonical_features_sha256={feat_hash}\n"
+                  "# recipe: scorelines.fit_rho_from_data (Poisson-regression "
+                  "lambdas, tau MLE on the four low-score cells)\n")
+        with open(out_csv, "w", encoding="utf-8", newline="") as fh:
+            fh.write(header)
+            rows.to_csv(fh, index=False, float_format="%.6f")
+        print(f"wrote {out_csv}")
+
+    return rho
 
 
 if __name__ == "__main__":
-    rho = fit_rho_from_data()
-    print(f"Fitted Dixon-Coles rho = {rho:.4f}  (hard-coded value: {DIXON_COLES_RHO})")
+    rho = fit_rho_from_data(write_report=True)
+    print(f"Fitted Dixon-Coles rho = {rho:.4f}  (frozen constant: {DIXON_COLES_RHO})")

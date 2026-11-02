@@ -1,0 +1,5 @@
+# Dixon-Coles rho fit on canonical pre-cutoff data (remediation Phase 5).
+# date=2026-07-13  canonical_features_sha256=cdbfc5a6bcc83a6b71f57db1fcf674ec4acad1d5e0e9e1c9ca44b029bc56136d
+# recipe: scorelines.fit_rho_from_data (Poisson-regression lambdas, tau MLE on the four low-score cells)
+fitted_rho,frozen_constant,n_matches,n_00,n_01,n_10,n_11,reg_home_coef_elo,reg_home_coef_hadv,reg_home_intercept,reg_away_coef_elo,reg_away_intercept
+-0.050006,-0.050000,49404,3965,3455,5098,4908,0.816216,0.081295,0.390881,0.864793,0.095066

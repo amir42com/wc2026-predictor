@@ -1,11 +1,20 @@
 """
-Article figures 3, 4 and 6 from the backtest export.
+Article figures 3, 4, 6 and 10 in the website figure contract (DEC-121).
 
 Reads  reports/backtest_predictions.csv     (written by src/export_backtest.py)
-       reports/backtest_metrics_summary.csv  (combined row → Figure 3 table)
-Writes reports/figures/figure3_backtest_table.png
-       reports/figures/figure4_accuracy_wilson.png
-       reports/figures/figure6_blend_reliability.png
+       reports/backtest_metrics_summary.csv  (combined rows -> Figure 3 table)
+       reports/live_evaluation.csv           (written by live_evaluation --final)
+Writes reports/figures/<name>-light.png / <name>-dark.png (+ .svg) for
+       figure3_backtest_table, figure4_accuracy_wilson,
+       figure6_blend_reliability, figure10_live_evaluation
+
+Website contract: each figure is rendered once per theme, 1600 px wide, on a
+transparent background, with the site's text, soft and rule inks and the
+site's three series colours (amir42-web scripts/editorial-art/figures.ts,
+THEME_INK). Labels are about 48 px and notes about 40 px at that width.
+Colour is never the only carrier of meaning: every series also has a hatch
+or marker shape, a legend and direct labels. Titles and findings belong to
+the article caption, not the image. SVGs keep text as text.
 
 matplotlib only (no seaborn).
 
@@ -21,42 +30,90 @@ import matplotlib
 
 matplotlib.use("Agg")  # headless / file output only
 import matplotlib.pyplot as plt
+from matplotlib import font_manager
 
 REPORTS_DIR = Path(__file__).resolve().parents[1] / "reports"
 FIG_DIR = REPORTS_DIR / "figures"
 
-# Dark theme — matches the app (navy canvas). Baked into every saved figure.
-DARK_BG = "#0c1124"     # figure + axes facecolor
-DARK_TEXT = "#e8ecf6"   # primary text / titles
-DARK_TEXT2 = "#93a1c8"  # secondary text / tick labels
-DARK_GRID = "#1d2547"   # gridlines
-DARK_SPINE = "#26305a"  # axis spines
-ACCENT = "#4fc3f7"      # accent / highlight
+# ── website figure contract ─────────────────────────────────────────────────
+FIGURE_WIDTH_PX = 1600
+DPI = 200                                   # 8 in x 200 dpi = 1600 px
+PX = 72.0 / DPI                             # one figure pixel in points
+LABEL_PT, NOTE_PT, FIGURE_PT = 48 * PX, 40 * PX, 44 * PX
 
-# Outcome palette — RESERVED for match outcomes (home/draw/away). Used by
-# Figure 6 (reliability) only; lightened to read on the navy background.
-OUTCOME_COLORS = {"home": "#4fc3f7", "draw": "#b4bdd1", "away": "#f59e0b"}
-
-# System palette — for figures that compare the three SYSTEMS (Figures 3 & 4).
-# Deliberately NOT the outcome palette: violet family = "my models", teal =
-# the Elo benchmark that beat them. Tuned to read on the dark background.
-SYSTEM_COLORS = {
-    "Raw XGBoost":  "#B6A8E0",   # light violet
-    "Blend":        "#9B7BE0",   # brighter violet (production model)
-    "Elo baseline": "#2DD4BF",   # bright teal (the benchmark)
+THEMES = {
+    "light": {"text": "#211d1a", "soft": "#5f5a54", "rule": "#ccc6bb",
+              "series": ("#3b6fb0", "#c76d3a", "#4f8f6a")},
+    "dark":  {"text": "#e7e3dd", "soft": "#bab5ad", "rule": "#4b4843",
+              "series": ("#6f9bd8", "#e0905f", "#7ab894")},
 }
 
+# Fixed system order -> series slot, the same meaning in every figure.
+SYSTEMS = ("Raw XGBoost", "Blend", "Elo baseline")
+SYSTEM_SLOT = {name: i for i, name in enumerate(SYSTEMS)}
+# Secondary encoding so identity never rests on colour alone.
+SYSTEM_HATCH = {"Raw XGBoost": "//", "Blend": "", "Elo baseline": ".."}
+SYSTEM_MARKER = {"Raw XGBoost": "o", "Blend": "D", "Elo baseline": "s"}
+OUTCOMES = (("home", "Home win", "o"), ("draw", "Draw", "s"), ("away", "Away win", "^"))
 
-def _dark_axes(fig, ax) -> None:
-    """Apply the dark theme tokens to a figure + axes (chart figures)."""
-    fig.patch.set_facecolor(DARK_BG)
-    ax.set_facecolor(DARK_BG)
-    ax.tick_params(colors=DARK_TEXT2)
-    for spine in ax.spines.values():
-        spine.set_color(DARK_SPINE)
-    ax.title.set_color(DARK_TEXT)
-    ax.xaxis.label.set_color(DARK_TEXT)
-    ax.yaxis.label.set_color(DARK_TEXT)
+
+def _font_family() -> str:
+    """Inter when installed (the website's face), else DejaVu Sans."""
+    names = {f.name for f in font_manager.fontManager.ttflist}
+    return "Inter" if "Inter" in names else "DejaVu Sans"
+
+
+FONT = _font_family()
+
+
+def system_color(theme: dict, system: str) -> str:
+    return theme["series"][SYSTEM_SLOT[system]]
+
+
+def _style(theme: dict) -> None:
+    plt.rcParams.update({
+        "font.family": FONT, "font.size": NOTE_PT,
+        "text.color": theme["text"], "axes.labelcolor": theme["text"],
+        "axes.edgecolor": theme["rule"], "axes.labelsize": LABEL_PT,
+        "xtick.color": theme["soft"], "ytick.color": theme["soft"],
+        "xtick.labelcolor": theme["text"], "ytick.labelcolor": theme["soft"],
+        "xtick.labelsize": LABEL_PT, "ytick.labelsize": NOTE_PT,
+        "axes.grid": False, "grid.color": theme["rule"], "grid.linewidth": 1.0,
+        "hatch.color": theme["text"], "hatch.linewidth": 1.2,
+        "legend.frameon": False, "legend.fontsize": NOTE_PT,
+        "svg.fonttype": "none", "svg.hashsalt": "wc2026-figures",
+        "axes.spines.top": False, "axes.spines.right": False,
+    })
+
+
+def _clean_axes(ax, theme: dict, grid_axis: str = "y") -> None:
+    if grid_axis:
+        ax.grid(axis=grid_axis, color=theme["rule"], linewidth=1.0, zorder=0)
+    ax.set_axisbelow(True)
+    for side in ("left", "bottom"):
+        ax.spines[side].set_color(theme["rule"])
+    ax.tick_params(length=0, pad=8)
+
+
+def render_pair(name: str, draw, height_px: int) -> list[Path]:
+    """Render `draw(fig, theme)` once per theme at 1600 px wide on a
+    transparent background; write <name>-<theme>.png and .svg."""
+    FIG_DIR.mkdir(parents=True, exist_ok=True)
+    written = []
+    for theme_name, theme in THEMES.items():
+        with plt.rc_context():
+            _style(theme)
+            fig = plt.figure(figsize=(FIGURE_WIDTH_PX / DPI, height_px / DPI),
+                             dpi=DPI, layout="constrained")
+            fig.get_layout_engine().set(w_pad=24 / DPI, h_pad=24 / DPI)
+            draw(fig, theme)
+            for ext, meta in (("png", {"Software": None}), ("svg", {"Date": None})):
+                out = FIG_DIR / f"{name}-{theme_name}.{ext}"
+                fig.savefig(out, dpi=DPI, transparent=True, metadata=meta)
+                written.append(out)
+            plt.close(fig)
+    print("Wrote " + ", ".join(p.name for p in written))
+    return written
 
 
 # --------------------------------------------------------------------------- #
@@ -155,139 +212,34 @@ def _reliability_points(hit: np.ndarray, p: np.ndarray, n_bins: int = 10):
 
 
 # --------------------------------------------------------------------------- #
-# Figure 4 — accuracy with Wilson intervals
+# Shared bar and legend helpers
 # --------------------------------------------------------------------------- #
-def figure4(df: pd.DataFrame) -> None:
-    n = len(df)
-    y = df["y_true"].values
+def _bar(ax, theme: dict, x, height, system: str, width: float, **kw):
+    """One system's bars: its series colour and its hatch."""
+    return ax.bar(x, height, width=width, color=system_color(theme, system),
+                  hatch=SYSTEM_HATCH[system], edgecolor=theme["text"],
+                  linewidth=0, zorder=2, label=system, **kw)
 
-    specs = [
-        ("Raw XGBoost", ["xgb_home", "xgb_draw", "xgb_away"], SYSTEM_COLORS["Raw XGBoost"]),
-        ("Blend",       ["blend_home", "blend_draw", "blend_away"], SYSTEM_COLORS["Blend"]),
-        ("Elo",         ["elo_home", "elo_draw", "elo_away"], SYSTEM_COLORS["Elo baseline"]),
-    ]
 
-    labels, ks, accs, los, his, colors = [], [], [], [], [], []
-    for label, cols, color in specs:
-        pred = df[cols].values.argmax(axis=1)
-        k = int((pred == y).sum())
-        lo, hi = wilson_interval(k, n)
-        labels.append(label)
-        ks.append(k)
-        accs.append(k / n)
-        los.append(lo)
-        his.append(hi)
-        colors.append(color)
-
-    fig, ax = plt.subplots(figsize=(7.2, 4.8))
-    _dark_axes(fig, ax)
-    x = np.arange(len(labels))
-    accs = np.array(accs)
-    yerr = np.vstack([accs - np.array(los), np.array(his) - accs])
-
-    bars = ax.bar(x, accs, width=0.58, color=colors, edgecolor=DARK_BG,
-                  linewidth=0.8, zorder=2)
-    ax.errorbar(x, accs, yerr=yerr, fmt="none", ecolor=DARK_TEXT,
-                elinewidth=1.5, capsize=8, capthick=1.5, zorder=3)
-
-    for xi, (acc, k, lo, hi) in enumerate(zip(accs, ks, los, his)):
-        ax.text(xi, acc + 0.002, f"{_fmt_pct(acc)}\n({k}/{n})",
-                ha="center", va="bottom", fontsize=10, fontweight="bold",
-                color=DARK_TEXT)
-        ax.text(xi, hi + 0.006, f"95% CI\n[{lo*100:.1f}, {hi*100:.1f}]",
-                ha="center", va="bottom", fontsize=8, color=DARK_TEXT2)
-
-    ax.set_ylim(0.40, 0.70)
-    ax.set_xticks(x)
-    ax.set_xticklabels(labels, fontsize=11, color=DARK_TEXT)
-    ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda v, _: f"{v*100:.0f}%"))
-    ax.set_ylabel("Accuracy", fontsize=11)
-    spread = max(ks) - min(ks)   # derived from the predictions, never hard-coded
-    ax.set_title(f"WC backtest accuracy ({n} matches, "
-                 f"{_years_label(df['tournament'])})\n"
-                 f"Point estimates differ by at most {spread} matches; "
-                 "Wilson 95% intervals overlap heavily",
-                 fontsize=11.5)
-    ax.grid(axis="y", color=DARK_GRID, linewidth=0.7, zorder=0)
-    ax.set_axisbelow(True)
-    for s in ("top", "right"):
-        ax.spines[s].set_visible(False)
-
-    fig.tight_layout()
-    out = FIG_DIR / "figure4_accuracy_wilson.png"
-    fig.savefig(out, dpi=220, facecolor=DARK_BG)
-    plt.close(fig)
-    print(f"Wrote {out}")
-    print("  Accuracy (k/n) with 95% Wilson intervals:")
-    for label, k, acc, lo, hi in zip(labels, ks, accs, los, his):
-        print(f"    {label:<12} {k:>3}/{n}  {_fmt_pct(acc):>7}  "
-              f"[{lo*100:.1f}%, {hi*100:.1f}%]")
+def _legend(ax, theme: dict, systems) -> None:
+    """Legend above the axes, swatches carrying the same hatch as the bars."""
+    handles = [plt.Rectangle((0, 0), 1, 1, facecolor=system_color(theme, s),
+                             hatch=SYSTEM_HATCH[s], edgecolor=theme["text"],
+                             linewidth=0) for s in systems]
+    ax.legend(handles, systems, loc="lower left", bbox_to_anchor=(0, 1.02),
+              ncol=len(systems), fontsize=LABEL_PT, handlelength=1.6,
+              handleheight=1.0, columnspacing=1.6, borderaxespad=0)
 
 
 # --------------------------------------------------------------------------- #
-# Figure 6 — Blend reliability (one-vs-rest per class)
-# --------------------------------------------------------------------------- #
-def figure6(df: pd.DataFrame) -> None:
-    y = df["y_true"].values
-    proba = df[["blend_home", "blend_draw", "blend_away"]].values
-
-    overall_ece, per_class = multiclass_ece(y, proba, n_bins=10, strategy="quantile")
-    class_names = {0: "home", 1: "draw", 2: "away"}
-
-    fig, ax = plt.subplots(figsize=(6.4, 6.0))
-    _dark_axes(fig, ax)
-    ax.plot([0, 1], [0, 1], "--", color=DARK_TEXT2, linewidth=1.2,
-            label="Perfect calibration", zorder=1)
-
-    for c in range(3):
-        name = class_names[c]
-        hit = (y == c).astype(float)
-        xs, ys, ns = _reliability_points(hit, proba[:, c], n_bins=10)
-        sizes = 30 + (ns / ns.max()) * 120
-        ax.plot(xs, ys, "-", color=OUTCOME_COLORS[name], linewidth=1.6,
-                alpha=0.9, zorder=2)
-        ax.scatter(xs, ys, s=sizes, color=OUTCOME_COLORS[name],
-                   edgecolor=DARK_BG, linewidth=0.6, zorder=3,
-                   label=f"{name.capitalize()}  (ECE {per_class[c]*100:.1f}%)")
-
-    ax.set_xlim(0, 1)
-    ax.set_ylim(0, 1)
-    ax.set_aspect("equal", "box")
-    ax.set_xlabel("Mean predicted probability", fontsize=11)
-    ax.set_ylabel("Observed frequency", fontsize=11)
-    ax.set_title("Blend reliability — one-vs-rest, 10 equal-frequency bins\n"
-                 f"Overall multiclass ECE = {overall_ece*100:.1f}%  "
-                 "(point size ∝ bin count)",
-                 fontsize=11.5)
-    leg = ax.legend(loc="upper left", fontsize=9, framealpha=0.92,
-                    facecolor="#151d3b", edgecolor=DARK_SPINE)
-    for txt in leg.get_texts():
-        txt.set_color(DARK_TEXT)
-    ax.grid(color=DARK_GRID, linewidth=0.7, zorder=0)
-    ax.set_axisbelow(True)
-    for s in ("top", "right"):
-        ax.spines[s].set_visible(False)
-
-    fig.tight_layout()
-    out = FIG_DIR / "figure6_blend_reliability.png"
-    fig.savefig(out, dpi=220, facecolor=DARK_BG)
-    plt.close(fig)
-    print(f"Wrote {out}")
-    print("  Blend reliability — Expected Calibration Error:")
-    for c in range(3):
-        print(f"    {class_names[c]:<6} ECE {per_class[c]*100:.2f}%")
-    print(f"    overall ECE {overall_ece*100:.2f}%")
-
-
-# --------------------------------------------------------------------------- #
-# Figure 3 — combined backtest comparison table (rendered as an image)
+# Figure 3: combined backtest comparison table
 # --------------------------------------------------------------------------- #
 def _combined_metrics() -> tuple[pd.DataFrame, int, str]:
     """
     Pull the COMBINED (192-match) row for each system from the metrics summary,
     so the table can never drift from the data. Returns (rows in fixed order
     (Raw XGBoost, Blend, Elo baseline) with display names, match count,
-    'YYYY/YYYY/YYYY' tournament label) — all derived from the CSV.
+    'YYYY/YYYY/YYYY' tournament label), all derived from the CSV.
     """
     summary = pd.read_csv(REPORTS_DIR / "backtest_metrics_summary.csv")
     comb = summary[summary["tournament"] == "Combined"].set_index("model")
@@ -309,103 +261,249 @@ def _combined_metrics() -> tuple[pd.DataFrame, int, str]:
 
 def figure3() -> None:
     data, n_matches, years = _combined_metrics()
-
-    # Best per metric: accuracy higher is better; log-loss / Brier lower.
     best = {"accuracy": int(data["accuracy"].idxmax()),
             "log_loss": int(data["log_loss"].idxmin()),
             "brier":    int(data["brier"].idxmin())}
+    cols = {"accuracy": ("Accuracy", 1010), "log_loss": ("Log-loss", 1300),
+            "brier": ("Brier", 1560)}            # header, right edge (px)
+    header_h, row_h, top = 120, 130, 30
+    height = top + header_h + row_h * len(data) + 250
 
-    plt.rcParams["font.family"] = "DejaVu Sans"  # clean sans-serif
-    fig, ax = plt.subplots(figsize=(7.6, 3.0))
-    fig.patch.set_facecolor(DARK_BG)
-    ax.set_facecolor(DARK_BG)
-    ax.set_xlim(0, 1)
-    ax.set_ylim(0, 1)
-    ax.axis("off")
+    def draw(fig, theme):
+        fig.set_layout_engine("none")             # one manual full-bleed axes
+        ax = fig.add_axes((0, 0, 1, 1))
+        ax.set_xlim(0, FIGURE_WIDTH_PX)
+        ax.set_ylim(height, 0)                    # pixel coordinates, y down
+        ax.axis("off")
+        ax.plot([40, 1560], [top, top], color=theme["text"], linewidth=1.6)
+        hy = top + header_h / 2
+        ax.text(150, hy, "System", ha="left", va="center", fontsize=LABEL_PT,
+                fontweight="bold")
+        for label, xr in cols.values():
+            ax.text(xr, hy, label, ha="right", va="center", fontsize=LABEL_PT,
+                    fontweight="bold")
+        y = top + header_h
+        ax.plot([40, 1560], [y, y], color=theme["text"], linewidth=1.0)
+        for i, row in data.iterrows():
+            yc = y + row_h / 2
+            ax.add_patch(plt.Rectangle((40, yc - 34), 80, 68,
+                                       facecolor=system_color(theme, row["system"]),
+                                       hatch=SYSTEM_HATCH[row["system"]],
+                                       edgecolor=theme["text"], linewidth=0))
+            ax.text(150, yc, row["system"], ha="left", va="center",
+                    fontsize=LABEL_PT)
+            values = {"accuracy": _fmt_pct(row["accuracy"]),
+                      "log_loss": f"{row['log_loss']:.4f}",
+                      "brier": f"{row['brier']:.4f}"}
+            for key, (_, xr) in cols.items():
+                ax.text(xr, yc, values[key], ha="right", va="center",
+                        fontsize=FIGURE_PT,
+                        fontweight="bold" if best[key] == i else "normal")
+            y += row_h
+            last = i == len(data) - 1
+            ax.plot([40, 1560], [y, y], color=theme["text"] if last else theme["rule"],
+                    linewidth=1.6 if last else 1.0)
+        for k, note in enumerate((
+                "Bold: best in each column. Higher accuracy is better;",
+                "lower log-loss and Brier are better.",
+                f"{n_matches} matches, WC {years}, predicted before each tournament.")):
+            ax.text(40, y + 40 + 62 * k, note, ha="left", va="top",
+                    fontsize=NOTE_PT, color=theme["soft"])
 
-    # Column x-anchors (right edges for the numeric columns)
-    x_swatch = (0.015, 0.034)
-    x_system = 0.060
-    cols = {"accuracy": (0.40, 0.575),   # (cell left, right-align x)
-            "log_loss": (0.60, 0.775),
-            "brier":    (0.80, 0.975)}
-    headers = {"accuracy": "Accuracy", "log_loss": "Log-loss", "brier": "Brier"}
-
-    # Row geometry
-    header_y0, header_y1 = 0.80, 0.96
-    row_h = 0.175
-    top = header_y0
-    row_bands = [(top - (i + 1) * row_h, top - i * row_h) for i in range(len(data))]
-
-    INK = DARK_TEXT          # primary text on dark
-    GREY = DARK_TEXT2        # muted footnote
-    SEP = DARK_SPINE         # row separators / rules
-    HEADER_BG = "#151d3b"    # header fill
-    HIGHLIGHT = "#16304a"    # subtle accent-tinted band for the best value
-
-    # Header band
-    ax.add_patch(plt.Rectangle((0, header_y0), 1, header_y1 - header_y0,
-                               facecolor=HEADER_BG, edgecolor="none", zorder=1))
-    hy = (header_y0 + header_y1) / 2
-    ax.text(x_system, hy, "System", ha="left", va="center",
-            fontsize=11.5, fontweight="bold", color=INK, zorder=3)
-    for key, (_, xr) in cols.items():
-        ax.text(xr, hy, headers[key], ha="right", va="center",
-                fontsize=11.5, fontweight="bold", color=INK, zorder=3)
-
-    # Top + bottom rules of the table
-    ax.plot([0, 1], [header_y1, header_y1], color=INK, linewidth=1.3, zorder=2)
-    ax.plot([0, 1], [header_y0, header_y0], color=INK, linewidth=1.0, zorder=2)
-    ax.plot([0, 1], [row_bands[-1][0], row_bands[-1][0]], color=INK,
-            linewidth=1.3, zorder=2)
-
-    for i, (y0, y1) in enumerate(row_bands):
-        yc = (y0 + y1) / 2
-        row = data.iloc[i]
-        sys_color = SYSTEM_COLORS[row["system"]]
-
-        # Left colour swatch tying the row to its Figure 4 bar
-        ax.add_patch(plt.Rectangle((x_swatch[0], y0 + 0.018),
-                                   x_swatch[1] - x_swatch[0], (y1 - y0) - 0.036,
-                                   facecolor=sys_color, edgecolor="none", zorder=3))
-
-        # System name
-        ax.text(x_system, yc, row["system"], ha="left", va="center",
-                fontsize=11, color=INK, zorder=3)
-
-        # Numeric cells (right-aligned), best value highlighted + bold
-        values = {"accuracy": _fmt_pct(row["accuracy"]),
-                  "log_loss": f"{row['log_loss']:.4f}",
-                  "brier":    f"{row['brier']:.4f}"}
-        for key, (xl, xr) in cols.items():
-            is_best = best[key] == i
-            if is_best:
-                ax.add_patch(plt.Rectangle((xl, y0 + 0.012), xr - xl + 0.02,
-                                           (y1 - y0) - 0.024, facecolor=HIGHLIGHT,
-                                           edgecolor="none", zorder=2))
-            ax.text(xr, yc, values[key], ha="right", va="center",
-                    fontsize=11, color=INK,
-                    fontweight="bold" if is_best else "normal", zorder=4)
-
-        # Light separator between data rows
-        if i < len(row_bands) - 1:
-            ax.plot([0, 1], [y0, y0], color=SEP, linewidth=0.8, zorder=2)
-
-    # Footnote inside the image
-    ax.text(0, row_bands[-1][0] - 0.10,
-            "Accuracy higher is better; log-loss and Brier lower is better.  "
-            f"{n_matches} matches, WC {years}, leakage-free.",
-            ha="left", va="top", fontsize=8, color=GREY, zorder=3)
-
-    out = FIG_DIR / "figure3_backtest_table.png"
-    fig.savefig(out, dpi=220, bbox_inches="tight", facecolor=DARK_BG)
-    plt.close(fig)
-    plt.rcParams["font.family"] = plt.rcParamsDefault["font.family"]
-    print(f"Wrote {out}")
+    render_pair("figure3_backtest_table", draw, height)
     print("  Combined-row values pulled from the metrics summary:")
     for _, r in data.iterrows():
         print(f"    {r['system']:<13} acc {_fmt_pct(r['accuracy']):>7}   "
               f"log-loss {r['log_loss']:.4f}   Brier {r['brier']:.4f}")
+
+
+# --------------------------------------------------------------------------- #
+# Figure 4: accuracy with Wilson intervals
+# --------------------------------------------------------------------------- #
+def figure4(df: pd.DataFrame) -> None:
+    n = len(df)
+    y = df["y_true"].values
+    specs = [("Raw XGBoost", ["xgb_home", "xgb_draw", "xgb_away"]),
+             ("Blend", ["blend_home", "blend_draw", "blend_away"]),
+             ("Elo baseline", ["elo_home", "elo_draw", "elo_away"])]
+    rows = []
+    for system, cols in specs:
+        k = int((df[cols].values.argmax(axis=1) == y).sum())
+        lo, hi = wilson_interval(k, n)
+        rows.append((system, k, k / n, lo, hi))
+
+    def draw(fig, theme):
+        ax = fig.add_subplot()
+        _clean_axes(ax, theme)
+        x = np.arange(len(rows))
+        for xi, (system, k, acc, lo, hi) in zip(x, rows):
+            _bar(ax, theme, xi, acc, system, width=0.56)
+            ax.errorbar(xi, acc, yerr=[[acc - lo], [hi - acc]], fmt="none",
+                        ecolor=theme["text"], elinewidth=2.4, capsize=18,
+                        capthick=2.4, zorder=3)
+            ax.text(xi, hi + 0.048, _fmt_pct(acc), ha="center", va="bottom",
+                    fontsize=FIGURE_PT, fontweight="bold")
+            ax.text(xi, hi + 0.012, f"{k}/{n}  [{lo*100:.1f}, {hi*100:.1f}]",
+                    ha="center", va="bottom", fontsize=NOTE_PT, color=theme["soft"])
+        ax.set_ylim(0.30, 0.76)
+        ax.set_xticks(x)
+        ax.set_xticklabels([r[0] for r in rows])
+        ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda v, _: f"{v*100:.0f}%"))
+        ax.set_ylabel("Accuracy")
+        ax.set_xlabel(f"Error bars and brackets: 95% Wilson intervals.\n"
+                      f"{n} matches, WC {_years_label(df['tournament'])}.",
+                      fontsize=NOTE_PT, color=theme["soft"], labelpad=24)
+
+    render_pair("figure4_accuracy_wilson", draw, 1150)
+    print("  Accuracy (k/n) with 95% Wilson intervals:")
+    for system, k, acc, lo, hi in rows:
+        print(f"    {system:<12} {k:>3}/{n}  {_fmt_pct(acc):>7}  "
+              f"[{lo*100:.1f}%, {hi*100:.1f}%]")
+
+
+# --------------------------------------------------------------------------- #
+# Figure 6: Blend reliability (one-vs-rest per class)
+# --------------------------------------------------------------------------- #
+def figure6(df: pd.DataFrame) -> None:
+    y = df["y_true"].values
+    proba = df[["blend_home", "blend_draw", "blend_away"]].values
+    overall_ece, per_class = multiclass_ece(y, proba, n_bins=10, strategy="quantile")
+
+    def draw(fig, theme):
+        ax = fig.add_subplot()
+        _clean_axes(ax, theme, grid_axis="both")
+        ax.plot([0, 1], [0, 1], linestyle=(0, (6, 6)), color=theme["soft"],
+                linewidth=2.0, zorder=1, label="Perfect calibration")
+        for c, (_, label, marker) in enumerate(OUTCOMES):
+            hit = (y == c).astype(float)
+            xs, ys, ns = _reliability_points(hit, proba[:, c], n_bins=10)
+            color = theme["series"][c]
+            ax.plot(xs, ys, "-", color=color, linewidth=2.4, zorder=2)
+            ax.scatter(xs, ys, s=120 + (ns / ns.max()) * 380, marker=marker,
+                       color=color, linewidth=0, zorder=3,
+                       label=f"{label} (ECE {per_class[c]*100:.1f}%)")
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1)
+        ax.set_aspect("equal", "box")
+        ax.set_xlabel("Mean predicted probability")
+        ax.set_ylabel("Observed frequency")
+        ax.legend(loc="upper left", fontsize=NOTE_PT, markerscale=0.8,
+                  handletextpad=0.4, labelspacing=0.5)
+        ax.text(0.98, 0.02, f"Blend, {len(y)} matches. 10 equal-frequency\n"
+                f"bins per outcome; marker area shows\nbin size. "
+                f"Overall ECE {overall_ece*100:.1f}%.",
+                transform=ax.transAxes, ha="right", va="bottom",
+                fontsize=NOTE_PT, color=theme["soft"])
+
+    render_pair("figure6_blend_reliability", draw, 1600)
+    print("  Blend reliability, Expected Calibration Error:")
+    for c, (key, _, _) in enumerate(OUTCOMES):
+        print(f"    {key:<6} ECE {per_class[c]*100:.2f}%")
+    print(f"    overall ECE {overall_ece*100:.2f}%")
+
+
+# --------------------------------------------------------------------------- #
+# Figure 10: final live evaluation (WC 2026, 104 matches)
+# --------------------------------------------------------------------------- #
+LIVE_SCOPES = (("pooled", "All matches"),
+               ("prospective", "Logged before kickoff"),
+               ("retrospective", "Recomputed after"))
+# Two-line tick labels so the three groups never collide at 1600 px.
+LIVE_TICKS = {"pooled": "All\nmatches", "prospective": "Logged before\nkickoff",
+              "retrospective": "Recomputed\nafter"}
+
+
+def _live_metrics() -> dict:
+    """{scope: {"n", "blend", "elo", "diff"}} from reports/live_evaluation.csv;
+    diff is (mean, ci_low, ci_high) of Blend minus Elo log-loss, or None where
+    the paired tests are not applicable."""
+    import re
+
+    df = pd.read_csv(REPORTS_DIR / "live_evaluation.csv")
+    out = {}
+    for scope, _ in LIVE_SCOPES:
+        sub = df[df["scope"] == scope].set_index("system")
+        boot = sub.loc["Bootstrap logloss diff (Blend-Elo)"]
+        diff = None
+        if pd.notna(boot["mean_diff"]):
+            lo, hi = map(float, re.search(r"\[([-\d.]+), ([-\d.]+)\]",
+                                          boot["detail"]).groups())
+            diff = (float(boot["mean_diff"]), lo, hi)
+        out[scope] = {"n": int(sub.loc["Blend", "n"]), "blend": sub.loc["Blend"],
+                      "elo": sub.loc["Elo baseline"], "diff": diff}
+    return out
+
+
+def figure10() -> None:
+    m = _live_metrics()
+    systems = ("Blend", "Elo baseline")
+    keys = {"Blend": "blend", "Elo baseline": "elo"}
+    labels = [f"{LIVE_TICKS[s]}\nn = {m[s]['n']}" for s, _ in LIVE_SCOPES]
+    x = np.arange(len(LIVE_SCOPES))
+    w = 0.36
+
+    def draw(fig, theme):
+        ax_acc, ax_ll, ax_d = fig.subplots(3, 1, height_ratios=(1.1, 1.0, 0.85))
+        for ax in (ax_acc, ax_ll):
+            _clean_axes(ax, theme)
+        for i, system in enumerate(systems):
+            off = (i - 0.5) * (w + 0.02)
+            for xi, (scope, _) in zip(x, LIVE_SCOPES):
+                r = m[scope][keys[system]]
+                acc, ll = float(r["accuracy"]), float(r["log_loss"])
+                _bar(ax_acc, theme, xi + off, acc, system, width=w)
+                ax_acc.text(xi + off, acc + 0.02, f"{int(r['correct'])}",
+                            ha="center", va="bottom", fontsize=NOTE_PT)
+                _bar(ax_ll, theme, xi + off, ll, system, width=w)
+                ax_ll.text(xi + off, ll + 0.015, f"{ll:.3f}", ha="center",
+                           va="bottom", fontsize=NOTE_PT)
+        _legend(ax_acc, theme, systems)
+        ax_acc.set_ylim(0, 1.0)
+        ax_acc.yaxis.set_major_formatter(plt.FuncFormatter(lambda v, _: f"{v*100:.0f}%"))
+        ax_acc.set_ylabel("Accuracy (correct picks)")
+        ax_ll.set_ylim(0, 1.15)
+        ax_ll.set_ylabel("Log-loss")
+        for ax in (ax_acc, ax_ll):
+            ax.set_xticks(x)
+            ax.set_xticklabels(labels, fontsize=NOTE_PT)
+
+        # Panel 3: paired bootstrap interval of Blend minus Elo log-loss.
+        _clean_axes(ax_d, theme, grid_axis="x")
+        ax_d.axvline(0, color=theme["soft"], linewidth=2.0, zorder=1)
+        ys = np.arange(len(LIVE_SCOPES))[::-1]
+        for yi, (scope, _) in zip(ys, LIVE_SCOPES):
+            d = m[scope]["diff"]
+            if d is None:
+                ax_d.text(0.006, yi, f"not tested: {m[scope]['n']} matches",
+                          ha="left", va="center", fontsize=NOTE_PT,
+                          color=theme["soft"])
+                continue
+            mean, lo, hi = d
+            for xs_, ys_ in (([lo, hi], [yi, yi]), ([lo, lo], [yi - 0.2, yi + 0.2]),
+                             ([hi, hi], [yi - 0.2, yi + 0.2])):
+                ax_d.plot(xs_, ys_, color=theme["text"], linewidth=3.0, zorder=2)
+            ax_d.plot(mean, yi, "D", markersize=16, zorder=3,
+                      color=system_color(theme, "Blend"))
+            ax_d.text(0.006, yi, f"{mean:+.3f}  [{lo:+.3f}, {hi:+.3f}]",
+                      ha="left", va="center", fontsize=NOTE_PT)
+        ax_d.set_yticks(ys)
+        ax_d.set_yticklabels([name for _, name in LIVE_SCOPES], fontsize=NOTE_PT,
+                             color=theme["text"])
+        ax_d.set_ylim(-0.6, len(LIVE_SCOPES) - 0.4)
+        ax_d.set_xlim(-0.075, 0.125)              # room right of zero for values
+        ax_d.set_xticks([-0.06, -0.03, 0.0])
+        ax_d.tick_params(axis="x", labelsize=NOTE_PT)
+        ax_d.spines["left"].set_visible(False)
+        ax_d.set_xlabel("Blend minus Elo log-loss; below zero: Blend better.\n"
+                        "95% paired bootstrap interval, 10,000 resamples.",
+                        fontsize=NOTE_PT, color=theme["soft"], labelpad=16)
+
+    render_pair("figure10_live_evaluation", draw, 2300)
+    for scope, name in LIVE_SCOPES:
+        b, e, d = m[scope]["blend"], m[scope]["elo"], m[scope]["diff"]
+        print(f"    {name:<22} n={m[scope]['n']:<3} Blend {int(b['correct'])} "
+              f"ll {float(b['log_loss']):.4f} | Elo {int(e['correct'])} "
+              f"ll {float(e['log_loss']):.4f} | diff {d}")
 
 
 def main() -> None:
@@ -417,6 +515,8 @@ def main() -> None:
     figure4(df)
     print()
     figure6(df)
+    print()
+    figure10()
 
 
 if __name__ == "__main__":
