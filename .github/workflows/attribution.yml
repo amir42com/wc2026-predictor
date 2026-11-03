@@ -1,0 +1,48 @@
+# Repository provenance: commit messages and pull-request text name no tool and
+# carry no attribution, and every commit uses the owner's identity. It runs on
+# every push to master and on every pull request, including an edit to its
+# title or body. The check reads only Git history and the pull request.
+name: attribution
+
+permissions:
+  contents: read
+  pull-requests: read
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+concurrency:
+  group: attribution-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  attribution:
+    name: Check attribution
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+      - name: Test the check
+        run: node --test scripts/check-attribution.test.mjs
+      - name: Check attribution
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          if [ -n "$PR_NUMBER" ]; then
+            PR_TITLE="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq '.title')"
+            PR_BODY="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq '.body // ""')"
+            export PR_TITLE PR_BODY
+          fi
+          node scripts/check-attribution.mjs --base "$BASE_SHA" --head "$HEAD_SHA"
