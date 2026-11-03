@@ -1,0 +1,23 @@
+{
+  "schema": "project-preflight/draft-1",
+  "recordKind": "light-assertion",
+  "protocol": { "version": "v1", "revision": "v1.27" },
+  "project": "World Cup 2026 Predictor & Article",
+  "personalOsProject": "3c2b7da33f50813295e3fe6b447455dd",
+  "workUnit": "Provenance check in CI: commit messages and pull-request text carry no tool attribution, and every new commit uses the owner's identity",
+  "baseCommit": "8aab264ca367ab470388beb8ed78089a8d4c3e32",
+  "scope": [
+    "scripts/check-attribution.mjs, shared with the website repository, and scripts/check-attribution.test.mjs with synthetic fixtures",
+    ".github/workflows/attribution.yml, a check-only workflow on pushes to master and on pull requests, including edits",
+    "this record"
+  ],
+  "outOfScope": [
+    "rewriting history or normalising the identity of earlier commits",
+    "a ruleset or required check (not added; the workflow reports but does not block)",
+    "the model, data, reports, app and deployment"
+  ],
+  "fullPreflightTriggerFired": false,
+  "fullPreflightTriggerNote": "A read-only CI check is added; no Capability, model, data, trust boundary or deployment changes. Reversal is a revert. ENT-6 publication scope is unaffected.",
+  "riskTier": "T3",
+  "authorization": "owner approval 2026-11-03 (12:44 UTC) in the Project Hub thread of set A of the Git history attribution cleanup plan: port the attribution check without ruleset changes"
+}
