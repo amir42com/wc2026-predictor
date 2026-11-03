@@ -126,9 +126,29 @@ const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(scriptDirectory, "..");
 const ZERO_COMMIT = /^0+$/;
 
+// A push that replaced history (its base is missing or is not an ancestor of
+// the head) has no range of added commits, so every commit of the head is
+// checked.
+export function logRange(base, head, baseIsAncestor) {
+  if (!base || ZERO_COMMIT.test(base)) return ["-1", head];
+  return baseIsAncestor ? [`${base}..${head}`] : [head];
+}
+
+function isAncestor(base, head) {
+  if (!base || ZERO_COMMIT.test(base)) return false;
+  try {
+    execFileSync("git", ["merge-base", "--is-ancestor", base, head], {
+      cwd: repositoryRoot,
+      stdio: "ignore",
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function commits(base, head) {
-  const range =
-    !base || ZERO_COMMIT.test(base) ? ["-1", head] : [`${base}..${head}`];
+  const range = logRange(base, head, isAncestor(base, head));
   const output = execFileSync(
     "git",
     ["log", "--format=%H%x1f%an%x1f%ae%x1f%cn%x1f%ce%x1f%B%x1e", ...range],
