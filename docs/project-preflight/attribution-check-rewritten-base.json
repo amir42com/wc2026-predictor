@@ -1,0 +1,25 @@
+{
+  "schema": "project-preflight/draft-1",
+  "recordKind": "light-assertion",
+  "protocol": {
+    "version": "v1",
+    "revision": "v1.27"
+  },
+  "project": "World Cup 2026 Predictor & Article",
+  "personalOsProject": "3c2b7da33f50813295e3fe6b447455dd",
+  "workUnit": "Provenance check after a history rewrite: when a push replaced history, check every commit of the new head",
+  "baseCommit": "5710354cccd4e11cdffd8e8be014fd3f533de126",
+  "scope": [
+    "scripts/check-attribution.mjs, shared with the website repository, and scripts/check-attribution.test.mjs",
+    "this record"
+  ],
+  "outOfScope": [
+    "the history rewrite and force-push themselves, which need the owner's grouped approval",
+    "a ruleset or required check",
+    "the model, data, reports, app and deployment"
+  ],
+  "fullPreflightTriggerFired": false,
+  "fullPreflightTriggerNote": "A read-only CI check chooses a wider commit range when a push replaced history; no Capability, model, data, trust boundary or deployment changes. Reversal is a revert.",
+  "riskTier": "T3",
+  "authorization": "owner instruction 2026-11-03 (13:37 UTC) in the Project Hub thread to carry the Git history attribution cleanup through every repository and verify prevention before publishing"
+}

@@ -7,6 +7,7 @@ import {
   checkBranch,
   checkIdentity,
   findAttribution,
+  logRange,
 } from "./check-attribution.mjs";
 
 const script = fileURLToPath(new URL("./check-attribution.mjs", import.meta.url));
@@ -109,6 +110,14 @@ test("requires the owner's name and address as author and committer", () => {
     "author-identity",
     "committer-identity",
   ]);
+});
+
+test("checks every commit of the head when a push replaced history", () => {
+  const base = "a".repeat(40);
+  assert.deepEqual(logRange(base, "HEAD", true), [`${base}..HEAD`]);
+  assert.deepEqual(logRange(base, "HEAD", false), ["HEAD"]);
+  assert.deepEqual(logRange("0".repeat(40), "HEAD", false), ["-1", "HEAD"]);
+  assert.deepEqual(logRange(null, "HEAD", false), ["-1", "HEAD"]);
 });
 
 test("the command fails on an attributed pull-request body", () => {
